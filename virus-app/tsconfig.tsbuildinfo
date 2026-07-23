@@ -1,0 +1,1 @@
+{"root":["./src/app.tsx","./src/main.tsx","./src/vite-env.d.ts","./src/components/layout.tsx","./src/lib/supabase.ts","./src/lib/types.ts","./src/pages/dashboard.tsx","./src/pages/deviceoverview.tsx","./src/pages/scanhistory.tsx","./src/pages/scanresult.tsx","./src/pages/scansubmission.tsx","./src/pages/threatintel.tsx"],"version":"5.9.3"}
