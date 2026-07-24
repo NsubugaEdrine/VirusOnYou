@@ -1,13 +1,12 @@
-/* stylelint-disable at-rule-no-unknown */
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss/base";
+@import "tailwindcss/components";
+@import "tailwindcss/utilities";
 
 @layer base {
   :root {
     --color-primary: #7cb3ff;
     --color-on-primary: #002b6b;
-    --color-primary-container: #1a6dff;
+    --color-primary-container: #aeed0e;
     --color-on-primary-container: #d6e3ff;
     --color-primary-fixed: #d6e3ff;
     --color-primary-fixed-dim: #7cb3ff;
