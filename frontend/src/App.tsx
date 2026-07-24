@@ -18,6 +18,7 @@ export default function App() {
         <Route path="/scan-history" element={<ScanHistory />} />
         <Route path="/threat-intel" element={<ThreatIntel />} />
         <Route path="/scan-result" element={<ScanResult />} />
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Route>
     </Routes>
   )
