@@ -1,21 +1,9 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { useTheme } from '../lib/ThemeContext'
-import { useAuth } from '../lib/auth'
 
 export default function TopAppBar() {
-  const navigate = useNavigate()
   const [searchFocused, setSearchFocused] = useState(false)
   const { theme, setTheme } = useTheme()
-  const { user, signOut } = useAuth()
-
-  const displayName = user?.email?.split('@')[0] ?? 'Analyst'
-  const initials = displayName.slice(0, 2).toUpperCase()
-
-  async function handleSignOut() {
-    await signOut()
-    navigate('/login')
-  }
 
   return (
     <header className="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-margin h-16 bg-surface-container-low border-b border-outline-variant">
@@ -57,24 +45,6 @@ export default function TopAppBar() {
           <span className="material-symbols-outlined">notifications</span>
           <span className="absolute top-2 right-2 w-2 h-2 bg-error rounded-full" aria-hidden="true"></span>
         </button>
-
-        <div className="flex items-center gap-3 pl-4 border-l border-outline-variant">
-          <div className="text-right hidden sm:block">
-            <p className="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-widest">
-              Analyst
-            </p>
-            <p className="font-body-md text-body-md font-bold text-on-surface truncate max-w-[140px]">
-              {displayName}
-            </p>
-          </div>
-          <button
-            onClick={handleSignOut}
-            className="w-10 h-10 rounded-lg bg-primary-container flex items-center justify-center text-on-primary-container font-bold hover:shadow-glow-primary transition-all"
-            title="Sign out"
-          >
-            {initials}
-          </button>
-        </div>
       </div>
     </header>
   )

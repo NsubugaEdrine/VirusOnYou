@@ -1,20 +1,22 @@
-import { useState, useRef, useCallback, useEffect } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { DeviceScanFile, DeviceScanSession } from '../lib/types'
 
-type ScanMode = 'idle' | 'scanning' | 'complete'
-type ScanType = 'quick' | 'full' | 'custom' | 'integrity'
 type DeviceView = 'detection' | 'options' | 'scanning' | 'complete'
+type ScanType = 'quick' | 'full' | 'custom' | 'integrity'
+type ApiStatus = 'available' | 'unavailable' | 'permission_denied'
 
 interface DetectedDevice {
   id: string
   name: string
+  type: string
+  protocol: 'usb' | 'serial' | 'bluetooth' | 'media' | 'storage'
   vendorId?: number
   productId?: number
   manufacturer?: string
   serialNumber?: string
-  type: string
   connectedAt: Date
+  apiDetail?: string
 }
 
 const MALICIOUS_EXTENSIONS = ['.exe', '.bat', '.cmd', '.vbs', '.js', '.ws', '.wsh', '.ps1', '.msi', '.com', '.pif', '.scr', '.hta', '.cpl']
@@ -23,8 +25,7 @@ const SUSPICIOUS_EXTENSIONS = ['.apk', '.dex', '.jar', '.class', '.swf', '.docm'
 async function computeSHA256(file: File): Promise<string> {
   const buffer = await file.arrayBuffer()
   const hashBuffer = await crypto.subtle.digest('SHA-256', buffer)
-  const hashArray = Array.from(new Uint8Array(hashBuffer))
-  return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('')
+  return Array.from(new Uint8Array(hashBuffer)).map((b) => b.toString(16).padStart(2, '0')).join('')
 }
 
 function getExtension(name: string): string {
@@ -40,10 +41,9 @@ function formatBytes(bytes: number): string {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i]
 }
 
-function analyzeFileForThreats(file: File, sha256: string): { threatLevel: DeviceScanFile['threatLevel']; threatName: string | null; riskScore: number; details: string } {
+function analyzeFileForThreats(file: File, sha256: string) {
   const ext = getExtension(file.name)
   const name = file.name.toLowerCase()
-
   let riskScore = 0
   const reasons: string[] = []
 
@@ -54,7 +54,6 @@ function analyzeFileForThreats(file: File, sha256: string): { threatLevel: Devic
     riskScore += 25
     reasons.push(`Suspicious extension "${ext}" requires further analysis`)
   }
-
   if (file.size === 0) {
     riskScore += 40
     reasons.push('File is empty (0 bytes) — possible corruption')
@@ -62,24 +61,19 @@ function analyzeFileForThreats(file: File, sha256: string): { threatLevel: Devic
     riskScore += 15
     reasons.push('Unusually large file size (>500MB)')
   }
-
-  const doubleExtPattern = /\.\w+\.\w+$/
-  if (doubleExtPattern.test(file.name)) {
+  if (/\.\w+\.\w+$/.test(file.name)) {
     riskScore += 20
     reasons.push('Double extension — common social engineering technique')
   }
-
   const suspiciousNames = ['autorun', 'setup', 'install', 'update', 'patch', 'crack', 'keygen', 'loader']
   if (suspiciousNames.some((n) => name.includes(n))) {
     riskScore += 15
     reasons.push('Filename matches known suspicious patterns')
   }
-
   if (sha256 === '0'.repeat(64)) {
     riskScore += 50
     reasons.push('SHA-256 is all zeros — file may be corrupted')
   }
-
   riskScore = Math.min(100, riskScore)
 
   let threatLevel: DeviceScanFile['threatLevel'] = 'None'
@@ -89,32 +83,26 @@ function analyzeFileForThreats(file: File, sha256: string): { threatLevel: Devic
   else if (riskScore >= 25) { threatLevel = 'Medium'; threatName = 'Potential Risk Indicators' }
   else if (riskScore >= 10) { threatLevel = 'Low'; threatName = 'Low Risk Indicators' }
 
-  const details = reasons.length > 0 ? reasons.join(' • ') : 'No anomalies detected — file appears clean'
-  return { threatLevel, threatName, riskScore, details }
+  return { threatLevel, threatName, riskScore, details: reasons.length > 0 ? reasons.join(' • ') : 'No anomalies detected — file appears clean' }
 }
 
-function detectDeviceType(d: { deviceClass: number }): string {
-  const subclass = d.deviceClass
-  if (subclass === 0) return 'Miscellaneous USB Device'
-  if (subclass === 1) return 'Audio Device'
-  if (subclass === 2) return 'CDC (Communications)'
-  if (subclass === 3) return 'HID Device'
-  if (subclass === 6) return 'Still Image Device'
-  if (subclass === 7) return 'Printer'
-  if (subclass === 8) return 'Mass Storage Device'
-  if (subclass === 9) return 'Hub'
-  if (subclass === 11) return 'Smart Card'
-  if (subclass === 220) return 'Vendor-Specific Device'
-  return `USB Device (Class ${subclass})`
+function usbClassToDeviceType(cls: number): string {
+  const map: Record<number, string> = {
+    0: 'Miscellaneous USB Device', 1: 'Audio Device', 2: 'CDC Communications',
+    3: 'HID Device', 6: 'Still Image Device', 7: 'Printer',
+    8: 'Mass Storage Device', 9: 'USB Hub', 11: 'Smart Card', 220: 'Vendor-Specific',
+  }
+  return map[cls] || `USB Device (Class ${cls})`
 }
 
-function getDeviceIcon(type: string): string {
-  if (type.includes('Mass Storage')) return 'usb'
-  if (type.includes('Audio')) return 'headphones'
-  if (type.includes('HID')) return 'mouse'
-  if (type.includes('Printer')) return 'print'
-  if (type.includes('Hub')) return 'hub'
-  return 'devices'
+function protocolIcon(p: DetectedDevice['protocol']): string {
+  const map: Record<string, string> = { usb: 'usb', serial: 'cable', bluetooth: 'bluetooth', media: 'videocam', storage: 'sd_storage' }
+  return map[p] || 'devices'
+}
+
+function protocolLabel(p: DetectedDevice['protocol']): string {
+  const map: Record<string, string> = { usb: 'USB', serial: 'Serial', bluetooth: 'Bluetooth', media: 'Media', storage: 'Storage' }
+  return map[p] || p
 }
 
 export default function DeviceScan() {
@@ -126,72 +114,75 @@ export default function DeviceScan() {
   const [session, setSession] = useState<DeviceScanSession | null>(null)
   const [currentScanFile, setCurrentScanFile] = useState('')
   const [progress, setProgress] = useState(0)
-  const [usbSupported, setUsbSupported] = useState(true)
-  const [lastEvent, setLastEvent] = useState<string>('')
+  const [eventLog, setEventLog] = useState<string[]>([])
+  const [apiStatuses, setApiStatuses] = useState<Record<string, ApiStatus>>({})
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const folderInputRef = useRef<HTMLInputElement>(null)
   const abortRef = useRef(false)
 
-  useEffect(() => {
-    if (folderInputRef.current) {
-      folderInputRef.current.setAttribute('webkitdirectory', '')
-    }
-  }, [])
+  function logEvent(msg: string) {
+    setEventLog((prev) => [`${new Date().toLocaleTimeString()} — ${msg}`, ...prev].slice(0, 50))
+  }
 
+  function addDevice(dev: DetectedDevice) {
+    setDevices((prev) => {
+      if (prev.some((p) => p.id === dev.id && p.protocol === dev.protocol)) return prev
+      return [...prev, dev]
+    })
+    logEvent(`Connected: ${dev.name} [${protocolLabel(dev.protocol)}]`)
+  }
+
+  function removeDevice(id: string, protocol: string) {
+    setDevices((prev) => prev.filter((p) => !(p.id === id && p.protocol === protocol)))
+    logEvent(`Disconnected: ${id} [${protocol}]`)
+    setSelectedDevice((prev) => (prev && prev.id === id && prev.protocol === protocol ? null : prev))
+  }
+
+  /* ═══════════════════════════════════════════════════════════
+     USB Detection (WebUSB API)
+     ═══════════════════════════════════════════════════════════ */
   useEffect(() => {
-    if (!navigator.usb) {
-      setUsbSupported(false)
-      setLastEvent('WebUSB API is not supported in this browser. Use Chrome or Edge for auto-detection, or select files manually.')
+    const usb = navigator.usb
+    if (!usb) {
+      setApiStatuses((prev) => ({ ...prev, usb: 'unavailable' }))
       return
     }
+    setApiStatuses((prev) => ({ ...prev, usb: 'available' }))
 
-    async function loadExistingDevices() {
-      try {
-        const existingDevices = await navigator.usb!.getDevices()
-        const mapped: DetectedDevice[] = existingDevices.map((d) => ({
+    usb.getDevices().then((existing) => {
+      existing.forEach((d) => {
+        addDevice({
           id: d.serialNumber || d.productName || `usb-${d.vendorId}-${d.productId}`,
           name: d.productName || d.manufacturerName || 'Unknown USB Device',
+          type: usbClassToDeviceType(d.deviceClass),
+          protocol: 'usb',
           vendorId: d.vendorId,
           productId: d.productId,
           manufacturer: d.manufacturerName,
           serialNumber: d.serialNumber,
-          type: detectDeviceType(d),
           connectedAt: new Date(),
-        }))
-        setDevices(mapped)
-        if (mapped.length > 0) setLastEvent(`${mapped.length} device(s) already paired with this browser.`)
-      } catch { /* silently fail */ }
-    }
-
-    loadExistingDevices()
-
-    const usb = navigator.usb
+          apiDetail: `USB v${d.usbVersionMajor}.${d.usbVersionMinor}`,
+        })
+      })
+    }).catch(() => {})
 
     function onConnect(e: Event) {
       const d = (e as USBConnectionEvent).device
-      const detected: DetectedDevice = {
+      addDevice({
         id: d.serialNumber || d.productName || `usb-${d.vendorId}-${d.productId}`,
         name: d.productName || d.manufacturerName || 'Unknown USB Device',
+        type: usbClassToDeviceType(d.deviceClass),
+        protocol: 'usb',
         vendorId: d.vendorId,
         productId: d.productId,
         manufacturer: d.manufacturerName,
         serialNumber: d.serialNumber,
-        type: detectDeviceType(d),
         connectedAt: new Date(),
-      }
-      setDevices((prev) => {
-        if (prev.some((p) => p.id === detected.id)) return prev
-        return [...prev, detected]
+        apiDetail: `USB v${d.usbVersionMajor}.${d.usbVersionMinor}`,
       })
-      setLastEvent(`Device connected: ${detected.name}`)
     }
-
     function onDisconnect(e: Event) {
       const d = (e as USBConnectionEvent).device
-      const id = d.serialNumber || d.productName || `usb-${d.vendorId}-${d.productId}`
-      setDevices((prev) => prev.filter((p) => p.id !== id))
-      setLastEvent(`Device disconnected: ${d.productName || 'Unknown Device'}`)
-      setSelectedDevice((prev) => (prev && prev.id === id ? null : prev))
+      removeDevice(d.serialNumber || d.productName || `usb-${d.vendorId}-${d.productId}`, 'usb')
     }
 
     usb.addEventListener('connect', onConnect)
@@ -202,32 +193,218 @@ export default function DeviceScan() {
     }
   }, [])
 
-  async function requestDevice() {
-    if (!navigator.usb) return
-    try {
-      const d = await navigator.usb.requestDevice({ filters: [] })
-      if (d) {
-        const detected: DetectedDevice = {
-          id: d.serialNumber || d.productName || `usb-${d.vendorId}-${d.productId}`,
-          name: d.productName || d.manufacturerName || 'Unknown USB Device',
-          vendorId: d.vendorId,
-          productId: d.productId,
-          manufacturer: d.manufacturerName,
-          serialNumber: d.serialNumber,
-          type: detectDeviceType(d),
+  /* ═══════════════════════════════════════════════════════════
+     Serial Detection (Web Serial API)
+     ═══════════════════════════════════════════════════════════ */
+  useEffect(() => {
+    const serial = navigator.serial
+    if (!serial) {
+      setApiStatuses((prev) => ({ ...prev, serial: 'unavailable' }))
+      return
+    }
+    setApiStatuses((prev) => ({ ...prev, serial: 'available' }))
+
+    serial.getPorts().then((ports) => {
+      ports.forEach((p) => {
+        const info = p.getInfo()
+        addDevice({
+          id: `serial-${info.usbVendorId || 0}-${info.usbProductId || 0}-${info.serialNumber || Math.random()}`,
+          name: info.productName || info.manufacturerName || 'Serial Device',
+          type: 'Serial Port',
+          protocol: 'serial',
+          vendorId: info.usbVendorId,
+          productId: info.usbProductId,
+          manufacturer: info.manufacturerName,
+          serialNumber: info.serialNumber,
           connectedAt: new Date(),
-        }
-        setDevices((prev) => {
-          if (prev.some((p) => p.id === detected.id)) return prev
-          return [...prev, detected]
+          apiDetail: 'Web Serial',
         })
-        setLastEvent(`Device added: ${detected.name}`)
+      })
+    }).catch(() => {})
+
+    function onConnect(e: Event) {
+      const port = (e as unknown as { port: SerialPort }).port
+      const info = port.getInfo()
+      addDevice({
+        id: `serial-${info.usbVendorId || 0}-${info.usbProductId || 0}-${info.serialNumber || Math.random()}`,
+        name: info.productName || info.manufacturerName || 'Serial Device',
+        type: 'Serial Port',
+        protocol: 'serial',
+        vendorId: info.usbVendorId,
+        productId: info.usbProductId,
+        manufacturer: info.manufacturerName,
+        serialNumber: info.serialNumber,
+        connectedAt: new Date(),
+        apiDetail: 'Web Serial',
+      })
+    }
+    function onDisconnect(e: Event) {
+      const port = (e as unknown as { port: SerialPort }).port
+      const info = port.getInfo()
+      removeDevice(`serial-${info.usbVendorId || 0}-${info.usbProductId || 0}-${info.serialNumber || ''}`, 'serial')
+    }
+
+    serial.addEventListener('connect', onConnect)
+    serial.addEventListener('disconnect', onDisconnect)
+    return () => {
+      serial.removeEventListener('connect', onConnect)
+      serial.removeEventListener('disconnect', onDisconnect)
+    }
+  }, [])
+
+  /* ═══════════════════════════════════════════════════════════
+     Bluetooth Detection (Web Bluetooth API)
+     ═══════════════════════════════════════════════════════════ */
+  useEffect(() => {
+    const bt = navigator.bluetooth
+    if (!bt) {
+      setApiStatuses((prev) => ({ ...prev, bluetooth: 'unavailable' }))
+      return
+    }
+    setApiStatuses((prev) => ({ ...prev, bluetooth: 'available' }))
+  }, [])
+
+  /* ═══════════════════════════════════════════════════════════
+     Media Device Detection (MediaDevices API)
+     ═══════════════════════════════════════════════════════════ */
+  useEffect(() => {
+    if (!navigator.mediaDevices?.enumerateDevices) {
+      setApiStatuses((prev) => ({ ...prev, media: 'unavailable' }))
+      return
+    }
+    setApiStatuses((prev) => ({ ...prev, media: 'available' }))
+
+    async function enumerate() {
+      try {
+        const devs = await navigator.mediaDevices.enumerateDevices()
+        devs.forEach((d) => {
+          if (d.kind === 'videoinput') {
+            addDevice({
+              id: `media-${d.deviceId}`,
+              name: d.label || 'Camera',
+              type: 'Camera / Video Input',
+              protocol: 'media',
+              connectedAt: new Date(),
+              apiDetail: d.groupId || 'MediaDevices',
+            })
+          } else if (d.kind === 'audioinput') {
+            addDevice({
+              id: `media-${d.deviceId}`,
+              name: d.label || 'Microphone',
+              type: 'Microphone / Audio Input',
+              protocol: 'media',
+              connectedAt: new Date(),
+              apiDetail: d.groupId || 'MediaDevices',
+            })
+          }
+        })
+      } catch {
+        setApiStatuses((prev) => ({ ...prev, media: 'permission_denied' }))
       }
+    }
+
+    enumerate()
+    if (navigator.mediaDevices.addEventListener) {
+      const handler = () => enumerate()
+      navigator.mediaDevices.addEventListener('devicechange', handler)
+      return () => navigator.mediaDevices.removeEventListener('devicechange', handler)
+    }
+  }, [])
+
+  /* ═══════════════════════════════════════════════════════════
+     Storage Detection (Storage API)
+     ═══════════════════════════════════════════════════════════ */
+  useEffect(() => {
+    if (!navigator.storage) {
+      setApiStatuses((prev) => ({ ...prev, storage: 'unavailable' }))
+      return
+    }
+    setApiStatuses((prev) => ({ ...prev, storage: 'available' }))
+
+    navigator.storage.estimate().then((est) => {
+      if (est.usage !== undefined && est.quota !== undefined) {
+        addDevice({
+          id: 'storage-local',
+          name: 'Local Browser Storage',
+          type: `Storage (${formatBytes(est.usage)} / ${formatBytes(est.quota)})`,
+          protocol: 'storage',
+          connectedAt: new Date(),
+          apiDetail: 'StorageManager API',
+        })
+      }
+    }).catch(() => {})
+  }, [])
+
+  /* ═══════════════════════════════════════════════════════════
+     Manual Request Helpers
+     ═══════════════════════════════════════════════════════════ */
+  async function requestUsbDevice() {
+    const usb = navigator.usb
+    if (!usb) return
+    try {
+      const d = await usb.requestDevice({ filters: [] })
+      addDevice({
+        id: d.serialNumber || d.productName || `usb-${d.vendorId}-${d.productId}`,
+        name: d.productName || d.manufacturerName || 'Unknown USB Device',
+        type: usbClassToDeviceType(d.deviceClass),
+        protocol: 'usb',
+        vendorId: d.vendorId,
+        productId: d.productId,
+        manufacturer: d.manufacturerName,
+        serialNumber: d.serialNumber,
+        connectedAt: new Date(),
+        apiDetail: `USB v${d.usbVersionMajor}.${d.usbVersionMinor}`,
+      })
     } catch {
-      setLastEvent('Device selection cancelled or not supported.')
+      logEvent('USB device selection cancelled')
     }
   }
 
+  async function requestSerialDevice() {
+    const serial = navigator.serial
+    if (!serial) return
+    try {
+      const port = await serial.requestPort()
+      const info = port.getInfo()
+      addDevice({
+        id: `serial-${info.usbVendorId || 0}-${info.usbProductId || 0}-${info.serialNumber || Math.random()}`,
+        name: info.productName || info.manufacturerName || 'Serial Device',
+        type: 'Serial Port',
+        protocol: 'serial',
+        vendorId: info.usbVendorId,
+        productId: info.usbProductId,
+        manufacturer: info.manufacturerName,
+        serialNumber: info.serialNumber,
+        connectedAt: new Date(),
+        apiDetail: 'Web Serial',
+      })
+    } catch {
+      logEvent('Serial port selection cancelled')
+    }
+  }
+
+  async function requestBluetoothDevice() {
+    const bt = navigator.bluetooth
+    if (!bt) return
+    try {
+      const device = await bt.requestDevice({ acceptAllDevices: true, optionalServices: ['battery_service', 'device_information'] })
+      addDevice({
+        id: `bt-${device.id}`,
+        name: device.name || 'Bluetooth Device',
+        type: 'Bluetooth Device',
+        protocol: 'bluetooth',
+        serialNumber: device.id,
+        connectedAt: new Date(),
+        apiDetail: 'Web Bluetooth',
+      })
+    } catch {
+      logEvent('Bluetooth device selection cancelled')
+    }
+  }
+
+  /* ═══════════════════════════════════════════════════════════
+     Scan Logic
+     ═══════════════════════════════════════════════════════════ */
   function selectDevice(device: DetectedDevice) {
     setSelectedDevice(device)
     setDeviceView('options')
@@ -246,18 +423,14 @@ export default function DeviceScan() {
       return
     }
     const files = Array.from(selected)
-
-    let filteredFiles = files
+    let filtered = files
     if (selectedScanType === 'quick') {
       const suspectExts = [...MALICIOUS_EXTENSIONS, ...SUSPICIOUS_EXTENSIONS]
-      filteredFiles = files.filter((f) => {
-        const ext = getExtension(f.name)
-        return suspectExts.includes(ext) || f.size === 0
-      })
-      if (filteredFiles.length === 0) filteredFiles = files.slice(0, 50)
+      filtered = files.filter((f) => suspectExts.includes(getExtension(f.name)) || f.size === 0)
+      if (filtered.length === 0) filtered = files.slice(0, 50)
     } else if (selectedScanType === 'integrity') {
-      filteredFiles = files.filter((f) => f.size === 0 || f.size < 1024)
-      if (filteredFiles.length === 0) filteredFiles = files.slice(0, 100)
+      filtered = files.filter((f) => f.size === 0 || f.size < 1024)
+      if (filtered.length === 0) filtered = files.slice(0, 100)
     }
 
     const sess: DeviceScanSession = {
@@ -266,13 +439,13 @@ export default function DeviceScan() {
       sourceType: 'files',
       startedAt: new Date().toISOString(),
       completedAt: null,
-      totalFiles: filteredFiles.length,
+      totalFiles: filtered.length,
       scannedFiles: 0,
       cleanFiles: 0,
       threatFiles: 0,
       corruptedFiles: 0,
       errorFiles: 0,
-      files: filteredFiles.map((f) => ({
+      files: filtered.map((f) => ({
         name: f.name,
         path: (f as unknown as {webkitRelativePath?: string}).webkitRelativePath || f.name,
         size: f.size,
@@ -286,10 +459,9 @@ export default function DeviceScan() {
       })),
       status: 'scanning',
     }
-
     setSession(sess)
     setScanning(true)
-    scanAllFiles(filteredFiles, sess)
+    scanAllFiles(filtered, sess)
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
@@ -304,7 +476,6 @@ export default function DeviceScan() {
     for (let i = 0; i < files.length; i++) {
       if (abortRef.current) break
       const file = files[i]
-
       setCurrentScanFile(file.name)
       setSession((prev) => {
         if (!prev) return prev
@@ -317,7 +488,6 @@ export default function DeviceScan() {
       try {
         const sha256 = await computeSHA256(file)
         const analysis = analyzeFileForThreats(file, sha256)
-
         let dbMatch = false
         if (existingHashes.has(sha256)) {
           analysis.riskScore = Math.max(analysis.riskScore, 80)
@@ -326,32 +496,26 @@ export default function DeviceScan() {
           analysis.details = `SHA-256 matches a previously submitted malicious scan. ${analysis.details}`
           dbMatch = true
         }
-
         const status: DeviceScanFile['status'] = analysis.riskScore >= 50 ? 'threat' : file.size === 0 ? 'corrupted' : 'clean'
-
         await new Promise((r) => setTimeout(r, 100))
-
         setSession((prev) => {
           if (!prev) return prev
           const updated = [...prev.files]
           updated[i] = { ...updated[i], sha256, status, ...analysis }
           return {
-            ...prev,
-            scannedFiles: i + 1,
+            ...prev, scannedFiles: i + 1,
             cleanFiles: prev.cleanFiles + (status === 'clean' ? 1 : 0),
             threatFiles: prev.threatFiles + (status === 'threat' ? 1 : 0),
             corruptedFiles: prev.corruptedFiles + (status === 'corrupted' ? 1 : 0),
             files: updated,
           }
         })
-
         if (dbMatch) {
           await supabase.from('scans').insert({
             file_name: file.name,
             package_name: file.name.replace(getExtension(file.name), ''),
             version: '1.0.0',
-            sha256,
-            status: 'Complete',
+            sha256, status: 'Complete',
             threat_level: analysis.threatLevel,
             risk_score: analysis.riskScore,
             risk_category: 'Device Scan',
@@ -406,319 +570,268 @@ export default function DeviceScan() {
   }
 
   const threatColor: Record<string, string> = {
-    Critical: 'text-error',
-    High: 'text-error',
-    Medium: 'text-secondary',
-    Low: 'text-on-surface-variant',
-    None: 'text-tertiary',
+    Critical: 'text-error', High: 'text-error', Medium: 'text-secondary',
+    Low: 'text-on-surface-variant', None: 'text-tertiary',
   }
 
-  const scanTypeOptions: Array<{
-    type: ScanType
-    icon: string
-    title: string
-    desc: string
-    time: string
-    color: string
-    borderColor: string
-    glowClass: string
-  }> = [
-    {
-      type: 'quick',
-      icon: 'bolt',
-      title: 'Quick Scan',
-      desc: 'Scans only suspicious and executable files by extension for fast threat detection.',
-      time: '~30 seconds',
-      color: 'bg-primary/15 text-primary',
-      borderColor: 'border-primary/30',
-      glowClass: 'hover:shadow-glow-primary',
-    },
-    {
-      type: 'full',
-      icon: 'scan',
-      title: 'Full Scan',
-      desc: 'Deep scan of every file — computes SHA-256 hashes and matches against the threat database.',
-      time: '~2-5 minutes',
-      color: 'bg-error/15 text-error',
-      borderColor: 'border-error/30',
-      glowClass: 'hover:shadow-glow-error',
-    },
-    {
-      type: 'integrity',
-      icon: 'verified',
-      title: 'Integrity Check',
-      desc: 'Checks for corrupted, empty, or truncated files that indicate storage damage.',
-      time: '~1 minute',
-      color: 'bg-tertiary/15 text-tertiary',
-      borderColor: 'border-tertiary/30',
-      glowClass: 'hover:shadow-glow-tertiary',
-    },
-    {
-      type: 'custom',
-      icon: 'tune',
-      title: 'Custom Scan',
-      desc: 'Select specific files or folders from the device to scan on your terms.',
-      time: 'Varies',
-      color: 'bg-secondary/15 text-secondary',
-      borderColor: 'border-secondary/30',
-      glowClass: 'hover:shadow-glow-secondary',
-    },
+  const apiInfo: Array<{ key: string; label: string; icon: string; desc: string }> = [
+    { key: 'usb', label: 'WebUSB', icon: 'usb', desc: 'USB drives, mass storage, peripherals' },
+    { key: 'serial', label: 'Web Serial', icon: 'cable', desc: 'Serial ports, Arduino, embedded devices' },
+    { key: 'bluetooth', label: 'Web Bluetooth', icon: 'bluetooth', desc: 'Bluetooth peripherals and sensors' },
+    { key: 'media', label: 'MediaDevices', icon: 'videocam', desc: 'Cameras, microphones, webcams' },
+    { key: 'storage', label: 'Storage API', icon: 'sd_storage', desc: 'Browser storage and quotas' },
   ]
 
+  const scanTypeOptions: Array<{ type: ScanType; icon: string; title: string; desc: string; time: string; color: string; border: string; glow: string }> = [
+    { type: 'quick', icon: 'bolt', title: 'Quick Scan', desc: 'Scans suspicious and executable files by extension for fast detection.', time: '~30 seconds', color: 'bg-primary/15 text-primary', border: 'border-primary/30', glow: 'hover:shadow-glow-primary' },
+    { type: 'full', icon: 'scan', title: 'Full Scan', desc: 'Deep scan of every file — SHA-256 hashes matched against the threat database.', time: '~2-5 minutes', color: 'bg-error/15 text-error', border: 'border-error/30', glow: 'hover:shadow-glow-error' },
+    { type: 'integrity', icon: 'verified', title: 'Integrity Check', desc: 'Detects corrupted, empty, or truncated files indicating storage damage.', time: '~1 minute', color: 'bg-tertiary/15 text-tertiary', border: 'border-tertiary/30', glow: 'hover:shadow-glow-tertiary' },
+    { type: 'custom', icon: 'tune', title: 'Custom Scan', desc: 'Hand-pick specific files or folders to scan on your own terms.', time: 'Varies', color: 'bg-secondary/15 text-secondary', border: 'border-secondary/30', glow: 'hover:shadow-glow-secondary' },
+  ]
+
+  /* ═══════════════════════════════════════════════════════════
+     RENDER
+     ═══════════════════════════════════════════════════════════ */
   return (
     <>
       <div className="absolute -top-[20%] -left-[10%] w-[500px] h-[500px] bg-secondary/4 rounded-full blur-[120px] pointer-events-none"></div>
 
-      {/* Hidden inputs */}
       <input ref={fileInputRef} type="file" multiple className="hidden" onChange={handleFileInput} />
-      <input ref={folderInputRef} type="file" multiple className="hidden" onChange={handleFileInput} />
 
       {/* Header */}
       <div className="flex flex-col gap-1 mb-6 relative">
         <h2 className="font-headline-lg text-headline-lg text-on-surface tracking-tight">External Device Scanner</h2>
         <p className="text-on-surface-variant font-body-md opacity-80">
-          Connect any external device — it will be detected automatically. Then choose a scan type.
+          Hardware detection is active across all available browser APIs. Connect a device and it will appear below automatically.
         </p>
       </div>
 
-      {/* Status Bar */}
-      {lastEvent && (
-        <div className="mb-6 glass-panel rounded-xl px-4 py-3 flex items-center gap-3 animate-glow-pulse">
-          <span className="material-symbols-outlined text-primary text-lg">info</span>
-          <span className="text-sm text-on-surface-variant flex-1">{lastEvent}</span>
-          <button onClick={() => setLastEvent('')} className="text-on-surface-variant hover:text-on-surface transition-colors">
-            <span className="material-symbols-outlined text-sm">close</span>
-          </button>
-        </div>
-      )}
-
-      {/* DETECTION VIEW */}
+      {/* ═══ DETECTION VIEW ═══ */}
       {deviceView === 'detection' && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 relative">
           <div className="lg:col-span-8 space-y-6">
-            {/* Detection Animation / Manual Add */}
+
+            {/* API Status Dashboard */}
+            <div className="glass-panel rounded-xl p-6">
+              <h3 className="font-label-caps text-label-caps text-on-surface-variant border-b border-outline-variant pb-3 mb-4 flex items-center gap-2">
+                <span className="material-symbols-outlined text-[16px] text-primary">developer_board</span>
+                HARDWARE API STATUS
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+                {apiInfo.map((api) => {
+                  const status = apiStatuses[api.key]
+                  const isOk = status === 'available'
+                  const isDenied = status === 'permission_denied'
+                  return (
+                    <div key={api.key} className={`p-3 rounded-lg border transition-all ${isOk ? 'bg-tertiary/5 border-tertiary/30' : isDenied ? 'bg-secondary/5 border-secondary/30' : 'bg-surface-container border-outline-variant/30'}`}>
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="material-symbols-outlined text-lg text-on-surface-variant">{api.icon}</span>
+                        <span className="font-label-caps text-[10px] text-on-surface-variant">{api.label}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className={`w-2 h-2 rounded-full ${isOk ? 'bg-tertiary animate-pulse' : isDenied ? 'bg-secondary' : 'bg-on-surface-variant/30'}`}></span>
+                        <span className={`text-[11px] font-bold ${isOk ? 'text-tertiary' : isDenied ? 'text-secondary' : 'text-on-surface-variant'}`}>
+                          {isOk ? 'ACTIVE' : isDenied ? 'NO PERMISSION' : 'NOT SUPPORTED'}
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-on-surface-variant/60 mt-1">{api.desc}</p>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Detection Animation */}
             <div className="glass-panel rounded-xl p-8 relative overflow-hidden">
               <div className="absolute -top-16 -right-16 w-48 h-48 bg-primary/5 rounded-full blur-3xl pointer-events-none"></div>
               <div className="flex flex-col md:flex-row items-center gap-8 relative z-10">
-                {/* Animated Detection Visual */}
                 <div className="relative shrink-0">
                   <div className="w-32 h-32 rounded-2xl bg-surface-container-high border border-outline-variant flex items-center justify-center relative">
-                    <span className="material-symbols-outlined text-5xl text-primary/30 animate-pulse">usb</span>
+                    <span className="material-symbols-outlined text-5xl text-primary/30 animate-pulse">radar</span>
                     <div className="absolute inset-0 rounded-2xl border-2 border-primary/20 animate-ping" style={{ animationDuration: '3s' }}></div>
                     <div className="absolute inset-[-8px] rounded-3xl border border-primary/10 animate-ping" style={{ animationDuration: '4s' }}></div>
+                    <div className="absolute inset-[-16px] rounded-3xl border border-primary/5 animate-ping" style={{ animationDuration: '5s' }}></div>
                   </div>
                   <div className="absolute -bottom-2 -right-2 w-8 h-8 rounded-full bg-tertiary flex items-center justify-center">
                     <span className="material-symbols-outlined text-sm text-on-tertiary">radar</span>
                   </div>
                 </div>
-
                 <div className="flex-1 text-center md:text-left">
-                  <h3 className="font-headline-md text-headline-md text-on-surface mb-2">Scanning for Devices</h3>
+                  <h3 className="font-headline-md text-headline-md text-on-surface mb-2">Hardware Detection Active</h3>
                   <p className="text-on-surface-variant text-body-md mb-4">
-                    Plug in a USB drive, SD card, or any external storage device. The scanner will detect it automatically.
+                    All browser hardware APIs are being monitored in real-time. Connect a USB drive, serial device, Bluetooth peripheral, or any external device — it will be detected automatically.
                   </p>
-                  <p className="text-on-surface-variant text-sm mb-4">
-                    {usbSupported
-                      ? 'WebUSB is active — connect a device or add one manually below.'
-                      : 'WebUSB is not supported in this browser. Use Chrome/Edge for auto-detection, or select files manually.'}
-                  </p>
-                  {usbSupported && (
-                    <button
-                      onClick={requestDevice}
-                      className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-primary to-primary-container text-on-primary font-label-caps text-label-caps hover:shadow-glow-primary transition-all inline-flex items-center gap-2"
-                    >
-                      <span className="material-symbols-outlined text-[18px]">usb</span>
-                      Add USB Device Manually
-                    </button>
-                  )}
+                  <div className="flex flex-wrap gap-2">
+                    {navigator.usb && (
+                      <button onClick={requestUsbDevice} className="px-4 py-2 rounded-lg bg-gradient-to-r from-primary to-primary-container text-on-primary font-label-caps text-label-caps hover:shadow-glow-primary transition-all inline-flex items-center gap-2">
+                        <span className="material-symbols-outlined text-[16px]">usb</span>
+                        Add USB Device
+                      </button>
+                    )}
+                    {navigator.serial && (
+                      <button onClick={requestSerialDevice} className="px-4 py-2 rounded-lg bg-gradient-to-r from-secondary to-secondary-container text-on-secondary font-label-caps text-label-caps hover:shadow-glow-secondary transition-all inline-flex items-center gap-2">
+                        <span className="material-symbols-outlined text-[16px]">cable</span>
+                        Add Serial Device
+                      </button>
+                    )}
+                    {navigator.bluetooth && (
+                      <button onClick={requestBluetoothDevice} className="px-4 py-2 rounded-lg bg-gradient-to-r from-tertiary to-tertiary-container text-on-tertiary font-label-caps text-label-caps hover:shadow-glow-tertiary transition-all inline-flex items-center gap-2">
+                        <span className="material-symbols-outlined text-[16px]">bluetooth</span>
+                        Add Bluetooth Device
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* Detected Devices List */}
-            {devices.length > 0 && (
+            {/* Detected Devices */}
+            {devices.length > 0 ? (
               <div className="glass-panel rounded-xl overflow-hidden">
                 <div className="p-4 border-b border-outline-variant bg-surface-container flex items-center justify-between">
                   <h4 className="font-headline-md text-headline-md flex items-center gap-2">
                     <span className="material-symbols-outlined text-primary text-lg">devices</span>
                     Detected Devices ({devices.length})
                   </h4>
-                  <span className="px-2 py-0.5 rounded-full bg-tertiary/15 text-tertiary text-[10px] font-bold border border-tertiary/25 animate-pulse">
-                    LIVE
-                  </span>
+                  <span className="px-2 py-0.5 rounded-full bg-tertiary/15 text-tertiary text-[10px] font-bold border border-tertiary/25 animate-pulse">LIVE</span>
                 </div>
                 <div className="divide-y divide-outline-variant/30">
                   {devices.map((device) => (
-                    <div
-                      key={device.id}
-                      className="p-4 flex items-center gap-4 hover:bg-surface-variant/20 transition-colors group cursor-pointer"
-                      onClick={() => selectDevice(device)}
-                    >
+                    <div key={`${device.protocol}-${device.id}`} className="p-4 flex items-center gap-4 hover:bg-surface-variant/20 transition-colors group cursor-pointer" onClick={() => selectDevice(device)}>
                       <div className="w-12 h-12 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0 group-hover:shadow-glow-primary transition-all">
-                        <span className="material-symbols-outlined text-primary">{getDeviceIcon(device.type)}</span>
+                        <span className="material-symbols-outlined text-primary">{protocolIcon(device.protocol)}</span>
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-0.5">
                           <span className="font-body-md font-bold text-on-surface truncate">{device.name}</span>
                           <span className="px-1.5 py-0.5 rounded bg-primary/10 text-primary text-[9px] font-bold border border-primary/20">CONNECTED</span>
+                          <span className="px-1.5 py-0.5 rounded bg-surface-variant text-on-surface-variant text-[9px] font-bold border border-outline-variant/50">{protocolLabel(device.protocol)}</span>
                         </div>
                         <p className="text-xs text-on-surface-variant">{device.type}</p>
-                        {device.manufacturer && (
-                          <p className="text-[11px] text-on-surface-variant/60">{device.manufacturer}</p>
-                        )}
+                        {device.manufacturer && <p className="text-[11px] text-on-surface-variant/60">{device.manufacturer}</p>}
+                        {device.apiDetail && <p className="text-[10px] text-on-surface-variant/40 font-code-sm">{device.apiDetail}</p>}
                       </div>
                       <button className="px-4 py-2 rounded-lg bg-gradient-to-r from-primary to-primary-container text-on-primary font-label-caps text-label-caps opacity-0 group-hover:opacity-100 transition-all hover:shadow-glow-primary">
-                        Scan Device
+                        Scan
                         <span className="material-symbols-outlined text-sm ml-1">arrow_forward</span>
                       </button>
                     </div>
                   ))}
                 </div>
               </div>
-            )}
-
-            {/* No devices */}
-            {devices.length === 0 && (
+            ) : (
               <div className="glass-panel rounded-xl p-8 text-center">
                 <span className="material-symbols-outlined text-5xl text-on-surface-variant/20 mb-4 block">usb_off</span>
                 <p className="text-on-surface-variant text-body-md mb-2">No devices detected yet</p>
-                <p className="text-on-surface-variant text-sm">Connect an external device or use the manual button above.</p>
+                <p className="text-on-surface-variant text-sm">Connect an external device or use the manual buttons above to request access.</p>
               </div>
             )}
           </div>
 
           {/* Side Panel */}
           <div className="lg:col-span-4 space-y-6">
-            {/* Detection Log */}
+            {/* Detection Event Log */}
             <div className="glass-panel rounded-xl p-6">
               <h3 className="font-label-caps text-label-caps text-on-surface-variant border-b border-outline-variant pb-3 mb-4 flex items-center gap-2">
                 <span className="material-symbols-outlined text-[16px] text-primary">terminal</span>
                 DETECTION LOG
               </h3>
-              <div className="space-y-3 max-h-[200px] overflow-y-auto custom-scrollbar">
-                {devices.length === 0 && !lastEvent ? (
+              <div className="space-y-2 max-h-[240px] overflow-y-auto custom-scrollbar">
+                {eventLog.length === 0 ? (
                   <p className="text-xs text-on-surface-variant/60">Waiting for device events...</p>
                 ) : (
-                  <>
-                    {devices.map((d) => (
-                      <div key={d.id} className="flex items-start gap-2">
-                        <span className="material-symbols-outlined text-[12px] text-tertiary mt-0.5">add_circle</span>
-                        <div>
-                          <p className="text-xs text-on-surface font-bold">{d.name}</p>
-                          <p className="text-[10px] text-on-surface-variant">{d.type}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </>
+                  eventLog.map((evt, i) => (
+                    <div key={i} className="flex items-start gap-2">
+                      <span className={`material-symbols-outlined text-[12px] mt-0.5 ${evt.includes('Connected') ? 'text-tertiary' : evt.includes('Disconnected') ? 'text-error' : 'text-primary'}`}>
+                        {evt.includes('Connected') ? 'add_circle' : evt.includes('Disconnected') ? 'remove_circle' : 'info'}
+                      </span>
+                      <p className="text-[11px] text-on-surface-variant leading-relaxed">{evt}</p>
+                    </div>
+                  ))
                 )}
               </div>
             </div>
 
-            {/* Scan Types Overview */}
-            <div className="glass-panel rounded-xl p-6">
-              <h3 className="font-label-caps text-label-caps text-on-surface-variant border-b border-outline-variant pb-3 mb-4 flex items-center gap-2">
-                <span className="material-symbols-outlined text-[16px] text-tertiary">shield</span>
-                SCAN TYPES
-              </h3>
-              <div className="space-y-3">
-                {scanTypeOptions.map((opt) => (
-                  <div key={opt.type} className="flex items-center gap-3 opacity-60">
-                    <span className={`w-8 h-8 rounded-lg ${opt.color} flex items-center justify-center border ${opt.borderColor}`}>
-                      <span className="material-symbols-outlined text-sm">{opt.icon}</span>
-                    </span>
-                    <div className="flex-1">
-                      <span className="text-sm font-bold text-on-surface">{opt.title}</span>
-                      <p className="text-[10px] text-on-surface-variant">{opt.time}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Manual Fallback */}
+            {/* Manual File Selection Fallback */}
             <div className="glass-panel rounded-xl p-6">
               <h3 className="font-label-caps text-label-caps text-on-surface-variant border-b border-outline-variant pb-3 mb-4 flex items-center gap-2">
                 <span className="material-symbols-outlined text-[16px] text-secondary">upload_file</span>
-                MANUAL SELECTION
+                MANUAL FILE SCAN
               </h3>
-              <p className="text-xs text-on-surface-variant mb-4">Skip detection and scan files directly from your computer.</p>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => { setSelectedDevice({ id: 'manual', name: 'Local Files', type: 'Manual Selection', connectedAt: new Date() }); setDeviceView('options') }}
-                  className="flex-1 px-3 py-2 rounded-lg border border-outline-variant text-on-surface-variant text-xs font-label-caps hover:bg-surface-variant hover:border-primary/30 transition-all text-center"
-                >
-                  Browse Files
-                </button>
+              <p className="text-xs text-on-surface-variant mb-4">Skip hardware detection and scan files directly from your system.</p>
+              <button
+                onClick={() => {
+                  const dev: DetectedDevice = { id: 'manual', name: 'Local Files', type: 'Manual Selection', protocol: 'usb', connectedAt: new Date() }
+                  setSelectedDevice(dev)
+                  setDeviceView('options')
+                }}
+                className="w-full px-4 py-2.5 rounded-lg border border-outline-variant text-on-surface-variant text-xs font-label-caps hover:bg-surface-variant hover:border-primary/30 transition-all text-center"
+              >
+                Browse Files Manually
+              </button>
+            </div>
+
+            {/* How It Works */}
+            <div className="rounded-xl overflow-hidden relative border border-outline-variant shadow-card">
+              <div className="w-full bg-gradient-to-br from-primary/10 via-surface-container to-tertiary/5 flex items-center justify-center h-32">
+                <span className="material-symbols-outlined text-primary/20 text-6xl">shield</span>
+              </div>
+              <div className="absolute inset-0 bg-gradient-to-t from-surface-container-low via-surface-container-low/50 to-transparent flex flex-col justify-end p-4">
+                <p className="font-label-caps text-label-caps text-primary mb-1">HOW IT WORKS</p>
+                <p className="text-sm font-bold text-on-surface">Connect a device — all browser hardware APIs detect it — then choose a scan type.</p>
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* OPTIONS VIEW */}
+      {/* ═══ OPTIONS VIEW ═══ */}
       {deviceView === 'options' && selectedDevice && (
         <div className="space-y-6 relative">
-          {/* Device Banner */}
           <div className="glass-panel rounded-xl p-6 flex items-center gap-4">
             <div className="w-14 h-14 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
-              <span className="material-symbols-outlined text-primary text-2xl">{getDeviceIcon(selectedDevice.type)}</span>
+              <span className="material-symbols-outlined text-primary text-2xl">{protocolIcon(selectedDevice.protocol)}</span>
             </div>
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-0.5">
                 <span className="font-headline-md text-headline-md text-on-surface">{selectedDevice.name}</span>
                 <span className="px-2 py-0.5 rounded bg-tertiary/15 text-tertiary text-[9px] font-bold border border-tertiary/20">CONNECTED</span>
+                <span className="px-1.5 py-0.5 rounded bg-surface-variant text-on-surface-variant text-[9px] font-bold border border-outline-variant/50">{protocolLabel(selectedDevice.protocol)}</span>
               </div>
               <p className="text-sm text-on-surface-variant">{selectedDevice.type}</p>
-              {selectedDevice.manufacturer && (
-                <p className="text-xs text-on-surface-variant/60">{selectedDevice.manufacturer}</p>
-              )}
+              {selectedDevice.manufacturer && <p className="text-xs text-on-surface-variant/60">{selectedDevice.manufacturer}</p>}
             </div>
-            <button
-              onClick={resetAll}
-              className="px-4 py-2 rounded-lg border border-outline-variant text-on-surface-variant text-sm hover:bg-surface-variant transition-all"
-            >
-              Disconnect
-            </button>
+            <button onClick={resetAll} className="px-4 py-2 rounded-lg border border-outline-variant text-on-surface-variant text-sm hover:bg-surface-variant transition-all">Back</button>
           </div>
 
-          {/* Scan Type Selection */}
-          <div className="relative">
-            <h3 className="font-headline-md text-headline-md text-on-surface mb-4">Choose Scan Type</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {scanTypeOptions.map((opt) => (
-                <button
-                  key={opt.type}
-                  onClick={() => startScan(opt.type)}
-                  className={`text-left p-6 rounded-xl border-2 ${opt.borderColor} bg-surface-container-lowest transition-all duration-300 ${opt.glowClass} group relative overflow-hidden`}
-                >
-                  <div className="absolute inset-0 bg-gradient-glow opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
-                  <div className="relative z-10">
-                    <div className={`w-12 h-12 rounded-xl ${opt.color} flex items-center justify-center border ${opt.borderColor} mb-4 group-hover:scale-110 transition-transform`}>
-                      <span className="material-symbols-outlined text-2xl">{opt.icon}</span>
-                    </div>
-                    <h4 className="font-headline-md text-headline-md text-on-surface mb-1">{opt.title}</h4>
-                    <p className="text-sm text-on-surface-variant mb-3">{opt.desc}</p>
-                    <div className="flex items-center gap-2">
-                      <span className="material-symbols-outlined text-[14px] text-on-surface-variant">schedule</span>
-                      <span className="text-xs text-on-surface-variant">{opt.time}</span>
-                    </div>
+          <h3 className="font-headline-md text-headline-md text-on-surface">Choose Scan Type</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {scanTypeOptions.map((opt) => (
+              <button key={opt.type} onClick={() => startScan(opt.type)} className={`text-left p-6 rounded-xl border-2 ${opt.border} bg-surface-container-lowest transition-all duration-300 ${opt.glow} group relative overflow-hidden`}>
+                <div className="absolute inset-0 bg-gradient-glow opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
+                <div className="relative z-10">
+                  <div className={`w-12 h-12 rounded-xl ${opt.color} flex items-center justify-center border ${opt.border} mb-4 group-hover:scale-110 transition-transform`}>
+                    <span className="material-symbols-outlined text-2xl">{opt.icon}</span>
                   </div>
-                </button>
-              ))}
-            </div>
+                  <h4 className="font-headline-md text-headline-md text-on-surface mb-1">{opt.title}</h4>
+                  <p className="text-sm text-on-surface-variant mb-3">{opt.desc}</p>
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-[14px] text-on-surface-variant">schedule</span>
+                    <span className="text-xs text-on-surface-variant">{opt.time}</span>
+                  </div>
+                </div>
+              </button>
+            ))}
           </div>
 
-          <button
-            onClick={resetAll}
-            className="text-on-surface-variant font-label-caps text-label-caps hover:text-primary transition-colors flex items-center gap-1"
-          >
+          <button onClick={resetAll} className="text-on-surface-variant font-label-caps text-label-caps hover:text-primary transition-colors flex items-center gap-1">
             <span className="material-symbols-outlined text-[16px]">arrow_back</span>
             Back to Device Detection
           </button>
         </div>
       )}
 
-      {/* SCANNING VIEW */}
+      {/* ═══ SCANNING VIEW ═══ */}
       {deviceView === 'scanning' && session && (
         <div className="space-y-6 relative">
           <div className="glass-panel rounded-xl p-6">
@@ -727,18 +840,13 @@ export default function DeviceScan() {
                 <span className="material-symbols-outlined animate-spin text-primary text-2xl">sync</span>
                 <div>
                   <h3 className="font-headline-md text-headline-md text-on-surface">
-                    {selectedScanType === 'quick' ? 'Quick' : selectedScanType === 'full' ? 'Full' : selectedScanType === 'integrity' ? 'Integrity' : 'Custom'} Scan
-                    — {session.deviceName}
+                    {selectedScanType === 'quick' ? 'Quick' : selectedScanType === 'full' ? 'Full' : selectedScanType === 'integrity' ? 'Integrity' : 'Custom'} Scan — {session.deviceName}
                   </h3>
                   <p className="text-on-surface-variant text-sm">{currentScanFile || 'Preparing...'}</p>
                 </div>
               </div>
-              <button
-                onClick={backToOptions}
-                className="px-4 py-2 rounded-lg border border-outline-variant text-on-surface-variant hover:bg-error/10 hover:text-error hover:border-error/30 transition-all font-label-caps text-label-caps"
-              >
-                <span className="material-symbols-outlined text-sm mr-1">stop</span>
-                Abort
+              <button onClick={backToOptions} className="px-4 py-2 rounded-lg border border-outline-variant text-on-surface-variant hover:bg-error/10 hover:text-error hover:border-error/30 transition-all font-label-caps text-label-caps">
+                <span className="material-symbols-outlined text-sm mr-1">stop</span>Abort
               </button>
             </div>
             <div className="w-full h-2 bg-surface-variant rounded-full overflow-hidden">
@@ -772,32 +880,15 @@ export default function DeviceScan() {
             </div>
             <div className="max-h-[400px] overflow-y-auto custom-scrollbar">
               {session.files.map((f, idx) => (
-                <div
-                  key={idx}
-                  className={`flex items-center gap-4 px-4 py-3 border-b border-outline-variant/30 transition-colors ${
-                    f.status === 'scanning' ? 'bg-primary/5' : ''
-                  }`}
-                >
-                  <span className={`material-symbols-outlined text-sm ${
-                    f.status === 'clean' ? 'text-tertiary' :
-                    f.status === 'threat' ? 'text-error' :
-                    f.status === 'corrupted' ? 'text-secondary' :
-                    f.status === 'scanning' ? 'text-primary animate-spin' :
-                    'text-on-surface-variant'
-                  }`}>
-                    {f.status === 'clean' ? 'check_circle' :
-                     f.status === 'threat' ? 'report' :
-                     f.status === 'corrupted' ? 'broken_image' :
-                     f.status === 'scanning' ? 'sync' :
-                     f.status === 'error' ? 'error' : 'radio_button_unchecked'}
+                <div key={idx} className={`flex items-center gap-4 px-4 py-3 border-b border-outline-variant/30 transition-colors ${f.status === 'scanning' ? 'bg-primary/5' : ''}`}>
+                  <span className={`material-symbols-outlined text-sm ${f.status === 'clean' ? 'text-tertiary' : f.status === 'threat' ? 'text-error' : f.status === 'corrupted' ? 'text-secondary' : f.status === 'scanning' ? 'text-primary animate-spin' : 'text-on-surface-variant'}`}>
+                    {f.status === 'clean' ? 'check_circle' : f.status === 'threat' ? 'report' : f.status === 'corrupted' ? 'broken_image' : f.status === 'scanning' ? 'sync' : f.status === 'error' ? 'error' : 'radio_button_unchecked'}
                   </span>
                   <div className="flex-1 min-w-0">
                     <p className="font-code-sm text-code-sm text-on-surface truncate">{f.name}</p>
                     <p className="text-[11px] text-on-surface-variant truncate">{f.path} — {formatBytes(f.size)}</p>
                   </div>
-                  {f.sha256 !== 'pending' && (
-                    <span className="font-code-sm text-[10px] text-on-surface-variant hidden md:block truncate max-w-[200px]">{f.sha256}</span>
-                  )}
+                  {f.sha256 !== 'pending' && <span className="font-code-sm text-[10px] text-on-surface-variant hidden md:block truncate max-w-[200px]">{f.sha256}</span>}
                   {f.status !== 'pending' && f.status !== 'scanning' && (
                     <span className={`font-label-caps text-[9px] px-2 py-0.5 rounded ${statusColor[f.status]}`}>
                       {f.status === 'threat' ? `${f.riskScore}/100` : f.status.toUpperCase()}
@@ -810,16 +901,14 @@ export default function DeviceScan() {
         </div>
       )}
 
-      {/* COMPLETE VIEW */}
+      {/* ═══ COMPLETE VIEW ═══ */}
       {deviceView === 'complete' && session && (
         <div className="space-y-6 relative">
           <div className="glass-panel rounded-xl p-6 relative overflow-hidden">
             <div className="absolute -top-8 -right-8 w-24 h-24 bg-primary/10 rounded-full blur-2xl pointer-events-none"></div>
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
               <div className="flex items-center gap-4">
-                <div className={`w-16 h-16 rounded-2xl flex items-center justify-center ${
-                  session.threatFiles > 0 ? 'bg-error/15 border border-error/30' : 'bg-tertiary/15 border border-tertiary/30'
-                }`}>
+                <div className={`w-16 h-16 rounded-2xl flex items-center justify-center ${session.threatFiles > 0 ? 'bg-error/15 border border-error/30' : 'bg-tertiary/15 border border-tertiary/30'}`}>
                   <span className={`material-symbols-outlined text-3xl ${session.threatFiles > 0 ? 'text-error' : 'text-tertiary'}`}>
                     {session.threatFiles > 0 ? 'warning' : 'verified'}
                   </span>
@@ -828,15 +917,10 @@ export default function DeviceScan() {
                   <h2 className="font-headline-lg text-headline-lg text-on-surface">
                     {session.threatFiles > 0 ? 'Threats Detected' : 'Scan Complete — All Clear'}
                   </h2>
-                  <p className="text-on-surface-variant text-body-md">
-                    {session.totalFiles} files scanned from {session.deviceName}
-                  </p>
+                  <p className="text-on-surface-variant text-body-md">{session.totalFiles} files scanned from {session.deviceName}</p>
                 </div>
               </div>
-              <button
-                onClick={resetAll}
-                className="px-6 py-3 rounded-xl bg-gradient-to-r from-primary to-primary-container text-on-primary font-bold hover:shadow-glow-primary transition-all flex items-center gap-2"
-              >
+              <button onClick={resetAll} className="px-6 py-3 rounded-xl bg-gradient-to-r from-primary to-primary-container text-on-primary font-bold hover:shadow-glow-primary transition-all flex items-center gap-2">
                 <span className="material-symbols-outlined text-sm">refresh</span>
                 Scan Another Device
               </button>
@@ -868,29 +952,14 @@ export default function DeviceScan() {
 
 function ScanResultList({ files, statusColor, threatColor }: { files: DeviceScanFile[]; statusColor: Record<string, string>; threatColor: Record<string, string> }) {
   const [tab, setTab] = useState<'all' | 'threat' | 'corrupted' | 'clean'>('all')
-
-  const filtered = files.filter((f) => {
-    if (tab === 'all') return true
-    if (tab === 'threat') return f.status === 'threat'
-    if (tab === 'corrupted') return f.status === 'corrupted'
-    if (tab === 'clean') return f.status === 'clean'
-    return true
-  })
+  const filtered = files.filter((f) => tab === 'all' || f.status === tab)
 
   return (
     <div className="glass-panel rounded-xl overflow-hidden">
       <div className="p-4 border-b border-outline-variant bg-surface-container flex items-center gap-3 flex-wrap">
         <h4 className="font-headline-md text-headline-md mr-4">Detailed Results</h4>
         {(['all', 'threat', 'corrupted', 'clean'] as const).map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`px-3 py-1 rounded-full font-label-caps text-label-caps transition-all ${
-              tab === t
-                ? 'bg-primary/10 text-primary border border-primary/30 shadow-glow-primary'
-                : 'border border-outline-variant text-on-surface-variant hover:bg-surface-variant'
-            }`}
-          >
+          <button key={t} onClick={() => setTab(t)} className={`px-3 py-1 rounded-full font-label-caps text-label-caps transition-all ${tab === t ? 'bg-primary/10 text-primary border border-primary/30 shadow-glow-primary' : 'border border-outline-variant text-on-surface-variant hover:bg-surface-variant'}`}>
             {t.charAt(0).toUpperCase() + t.slice(1)}
             <span className="ml-1 text-[10px] opacity-70">({files.filter((f) => t === 'all' || f.status === t).length})</span>
           </button>
@@ -903,14 +972,8 @@ function ScanResultList({ files, statusColor, threatColor }: { files: DeviceScan
           filtered.map((f, idx) => (
             <div key={idx} className="border-b border-outline-variant/30 p-4 hover:bg-surface-variant/20 transition-colors">
               <div className="flex items-start gap-4">
-                <span className={`material-symbols-outlined text-lg mt-0.5 ${
-                  f.status === 'clean' ? 'text-tertiary' :
-                  f.status === 'threat' ? 'text-error' :
-                  f.status === 'corrupted' ? 'text-secondary' : 'text-on-surface-variant'
-                }`}>
-                  {f.status === 'clean' ? 'check_circle' :
-                   f.status === 'threat' ? 'report' :
-                   f.status === 'corrupted' ? 'broken_image' : 'error'}
+                <span className={`material-symbols-outlined text-lg mt-0.5 ${f.status === 'clean' ? 'text-tertiary' : f.status === 'threat' ? 'text-error' : f.status === 'corrupted' ? 'text-secondary' : 'text-on-surface-variant'}`}>
+                  {f.status === 'clean' ? 'check_circle' : f.status === 'threat' ? 'report' : f.status === 'corrupted' ? 'broken_image' : 'error'}
                 </span>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-3 mb-1">
@@ -918,11 +981,7 @@ function ScanResultList({ files, statusColor, threatColor }: { files: DeviceScan
                     <span className={`px-2 py-0.5 rounded font-label-caps text-[9px] ${statusColor[f.status]}`}>
                       {f.status === 'threat' ? `${f.riskScore}/100` : f.status.toUpperCase()}
                     </span>
-                    {f.threatLevel !== 'None' && (
-                      <span className={`font-label-caps text-[9px] ${threatColor[f.threatLevel]}`}>
-                        {f.threatLevel.toUpperCase()}
-                      </span>
-                    )}
+                    {f.threatLevel !== 'None' && <span className={`font-label-caps text-[9px] ${threatColor[f.threatLevel]}`}>{f.threatLevel.toUpperCase()}</span>}
                   </div>
                   <p className="text-xs text-on-surface-variant mb-2 truncate">{f.path} — {formatBytes(f.size)}</p>
                   <p className="text-xs text-on-surface-variant mb-2">{f.details}</p>
@@ -930,9 +989,7 @@ function ScanResultList({ files, statusColor, threatColor }: { files: DeviceScan
                     <span className="font-code-sm text-[10px] text-on-surface-variant bg-surface-container px-2 py-1 rounded border border-outline-variant/30">
                       SHA-256: {f.sha256.slice(0, 32)}...
                     </span>
-                    {f.threatName && (
-                      <span className="text-[11px] text-on-surface-variant italic">{f.threatName}</span>
-                    )}
+                    {f.threatName && <span className="text-[11px] text-on-surface-variant italic">{f.threatName}</span>}
                   </div>
                 </div>
               </div>

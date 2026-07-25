@@ -1,3 +1,4 @@
+/* ─── WebUSB ─── */
 interface USBDevice {
   usbVersionMajor: number
   usbVersionMinor: number
@@ -95,10 +96,8 @@ interface USBConnectionEvent extends Event {
 interface USB {
   getDevices(): Promise<USBDevice[]>
   requestDevice(options?: { filters?: USBDeviceFilter[] }): Promise<USBDevice>
-  addEventListener(type: 'connect', listener: (event: USBConnectionEvent) => void): void
-  addEventListener(type: 'disconnect', listener: (event: USBConnectionEvent) => void): void
-  removeEventListener(type: 'connect', listener: (event: USBConnectionEvent) => void): void
-  removeEventListener(type: 'disconnect', listener: (event: USBConnectionEvent) => void): void
+  addEventListener(type: string, listener: (event: Event) => void): void
+  removeEventListener(type: string, listener: (event: Event) => void): void
 }
 
 interface USBDeviceFilter {
@@ -110,6 +109,101 @@ interface USBDeviceFilter {
   serialNumber?: string
 }
 
+/* ─── Web Serial ─── */
+interface SerialPort {
+  readonly readable: ReadableStream<Uint8Array> | null
+  readonly writable: WritableStream<Uint8Array> | null
+  readonly opened: boolean
+  open(options: { baudRate: number; dataBits?: number; stopBits?: number; parity?: string; bufferSize?: number; flowControl?: string }): Promise<void>
+  close(): Promise<void>
+  setSignals(signals: { dtr?: boolean; rts?: boolean }): Promise<void>
+  getSignals(): Promise<{ dcd: boolean; cts: boolean; dsr: boolean; ring: boolean }>
+  getInfo(): SerialPortInfo
+}
+
+interface SerialPortInfo {
+  usbVendorId?: number
+  usbProductId?: number
+  serialNumber?: string
+  manufacturerName?: string
+  productName?: string
+}
+
+interface Serial {
+  getPorts(): Promise<SerialPort[]>
+  requestPort(options?: { filters?: Array<{ usbVendorId?: number; usbProductId?: number }> }): Promise<SerialPort>
+  addEventListener(type: string, listener: (event: Event) => void): void
+  removeEventListener(type: string, listener: (event: Event) => void): void
+}
+
+interface SerialConnectionEvent extends Event {
+  port: SerialPort
+}
+
+/* ─── Web Bluetooth ─── */
+interface BluetoothDevice {
+  id: string
+  name: string | null
+  gatt?: BluetoothRemoteGATTServer
+  addEventListener(type: string, listener: (event: Event) => void): void
+  removeEventListener(type: string, listener: (event: Event) => void): void
+}
+
+interface BluetoothRemoteGATTServer {
+  device: BluetoothDevice
+  connected: boolean
+  connect(): Promise<BluetoothRemoteGATTServer>
+  disconnect(): void
+  getPrimaryService(service: string): Promise<BluetoothRemoteGATTService>
+}
+
+interface BluetoothRemoteGATTService {
+  device: BluetoothDevice
+  uuid: string
+  getCharacteristic(characteristic: string): Promise<BluetoothRemoteGATTCharacteristic>
+}
+
+interface BluetoothRemoteGATTCharacteristic {
+  service: BluetoothRemoteGATTService
+  uuid: string
+  readValue(): Promise<DataView>
+  writeValue(value: BufferSource): Promise<void>
+}
+
+interface Bluetooth {
+  requestDevice(options?: {
+    filters?: Array<{ name?: string; namePrefix?: string; services?: string[] }>
+    optionalServices?: string[]
+    acceptAllDevices?: boolean
+  }): Promise<BluetoothDevice>
+  addEventListener(type: string, listener: (event: Event) => void): void
+  removeEventListener(type: string, listener: (event: Event) => void): void
+}
+
+/* ─── Navigator extensions ─── */
 interface Navigator {
   usb?: USB
+  serial?: Serial
+  bluetooth?: Bluetooth
+  storage?: StorageManager
+}
+
+/* ─── StorageManager ─── */
+interface StorageManager {
+  persist(): Promise<boolean>
+  persisted(): Promise<boolean>
+  estimate(): Promise<StorageEstimate>
+  getDirectory(): FileSystemDirectoryHandle
+}
+
+interface StorageEstimate {
+  usage?: number
+  quota?: number
+}
+
+interface FileSystemDirectoryHandle {
+  getFileHandle(name: string): Promise<FileSystemFileHandle>
+  getDirectoryHandle(name: string): Promise<FileSystemDirectoryHandle>
+  removeEntry(name: string): Promise<void>
+  [Symbol.asyncIterator](): AsyncIterableIterator<[string, FileSystemFileHandle | FileSystemDirectoryHandle]>
 }

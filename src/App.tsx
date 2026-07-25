@@ -1,6 +1,5 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import Layout from './components/Layout'
-import ProtectedRoute from './components/ProtectedRoute'
 import Dashboard from './pages/Dashboard'
 import ScanSubmission from './pages/ScanSubmission'
 import DeviceOverview from './pages/DeviceOverview'
@@ -9,15 +8,11 @@ import ScanHistory from './pages/ScanHistory'
 import ThreatIntel from './pages/ThreatIntel'
 import ScanResult from './pages/ScanResult'
 import Settings from './pages/Settings'
-import Login from './pages/Login'
-import SignUp from './pages/SignUp'
 
 export default function App() {
   return (
     <Routes>
-      <Route path="/login" element={<Login />} />
-      <Route path="/signup" element={<SignUp />} />
-      <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
+      <Route element={<Layout />}>
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/scan-submission" element={<ScanSubmission />} />
