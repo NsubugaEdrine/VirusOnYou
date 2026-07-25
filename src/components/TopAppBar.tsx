@@ -7,10 +7,11 @@ export default function TopAppBar() {
 
   return (
     <header className="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-margin h-16 bg-surface-container-low border-b border-outline-variant">
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-3">
         <button className="material-symbols-outlined text-on-surface-variant hover:bg-surface-variant p-2 rounded-full transition-colors" aria-label="Open menu">
           menu
         </button>
+        <img src="/favicon.png" alt="VirusOnYou" className="w-8 h-8 rounded-lg object-cover" />
         <h1 className="font-headline-md text-headline-md font-bold text-primary tracking-tight">
           VirusOnYou
         </h1>
