@@ -35,10 +35,19 @@ export default function NavigationDrawer() {
       </nav>
 
       <div className="p-6 mt-auto border-t border-outline-variant">
-        <span className="flex items-center gap-3 px-4 py-3 text-on-surface-variant rounded-lg opacity-50 cursor-not-allowed">
+        <NavLink
+          to="/settings"
+          className={({ isActive }) =>
+            `flex items-center gap-3 px-4 py-3 transition-all rounded-lg ${
+              isActive
+                ? 'text-primary bg-primary/10'
+                : 'text-on-surface-variant hover:bg-surface-variant'
+            }`
+          }
+        >
           <span className="material-symbols-outlined">settings</span>
           <span className="font-label-caps text-label-caps">SETTINGS</span>
-        </span>
+        </NavLink>
       </div>
     </aside>
   )
