@@ -3,8 +3,8 @@ import { NavLink } from 'react-router-dom'
 const navItems = [
   { to: '/dashboard', label: 'HOME', icon: 'dashboard' },
   { to: '/scan-submission', label: 'NEW', icon: 'upload_file' },
+  { to: '/device-scan', label: 'SCAN DEV', icon: 'usb' },
   { to: '/scan-history', label: 'SCANS', icon: 'security' },
-  { to: '/device-overview', label: 'DEVICES', icon: 'devices' },
   { to: '/settings', label: 'CONFIG', icon: 'settings' },
 ]
 

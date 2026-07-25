@@ -63,3 +63,32 @@ export interface Component {
   name: string
   risk_level: 'Critical' | 'High' | 'Medium' | 'Low'
 }
+
+export interface DeviceScanFile {
+  name: string
+  path: string
+  size: number
+  type: string
+  sha256: string
+  status: 'pending' | 'scanning' | 'clean' | 'threat' | 'corrupted' | 'error'
+  threatLevel: 'Critical' | 'High' | 'Medium' | 'Low' | 'None'
+  threatName: string | null
+  riskScore: number
+  details: string
+}
+
+export interface DeviceScanSession {
+  id: string
+  deviceName: string
+  sourceType: 'folder' | 'files' | 'drive'
+  startedAt: string
+  completedAt: string | null
+  totalFiles: number
+  scannedFiles: number
+  cleanFiles: number
+  threatFiles: number
+  corruptedFiles: number
+  errorFiles: number
+  files: DeviceScanFile[]
+  status: 'idle' | 'selecting' | 'scanning' | 'complete'
+}

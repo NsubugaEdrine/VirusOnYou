@@ -3,6 +3,7 @@ import { NavLink } from 'react-router-dom'
 const navItems = [
   { to: '/dashboard', label: 'DASHBOARD', icon: 'dashboard' },
   { to: '/scan-submission', label: 'NEW SCAN', icon: 'upload_file' },
+  { to: '/device-scan', label: 'DEVICE SCAN', icon: 'usb' },
   { to: '/scan-history', label: 'SCANS', icon: 'security' },
   { to: '/device-overview', label: 'DEVICES', icon: 'devices' },
   { to: '/threat-intel', label: 'THREAT INTEL', icon: 'shield' },

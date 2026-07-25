@@ -4,6 +4,7 @@ import ProtectedRoute from './components/ProtectedRoute'
 import Dashboard from './pages/Dashboard'
 import ScanSubmission from './pages/ScanSubmission'
 import DeviceOverview from './pages/DeviceOverview'
+import DeviceScan from './pages/DeviceScan'
 import ScanHistory from './pages/ScanHistory'
 import ThreatIntel from './pages/ThreatIntel'
 import ScanResult from './pages/ScanResult'
@@ -21,6 +22,7 @@ export default function App() {
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/scan-submission" element={<ScanSubmission />} />
         <Route path="/device-overview" element={<DeviceOverview />} />
+        <Route path="/device-scan" element={<DeviceScan />} />
         <Route path="/scan-history" element={<ScanHistory />} />
         <Route path="/threat-intel" element={<ThreatIntel />} />
         <Route path="/scan-result" element={<ScanResult />} />
