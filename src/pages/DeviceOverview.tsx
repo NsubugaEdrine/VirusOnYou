@@ -2,9 +2,13 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { Device } from '../lib/types'
+import { useUser } from '../lib/userContext'
+import { isAdmin } from '../lib/user'
 
 export default function DeviceOverview() {
   const navigate = useNavigate()
+  const { userId } = useUser()
+  const admin = isAdmin()
   const [devices, setDevices] = useState<Device[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('')
@@ -16,7 +20,9 @@ export default function DeviceOverview() {
   async function fetchDevices() {
     setLoading(true)
     try {
-      const { data } = await supabase.from('devices').select('*').order('name')
+      let query = supabase.from('devices').select('*').order('name')
+      if (!admin) query = query.eq('user_id', userId)
+      const { data } = await query
       if (data) setDevices(data)
     } catch {
       // UI stays with empty devices

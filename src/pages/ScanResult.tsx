@@ -2,10 +2,14 @@ import { useState, useEffect } from 'react'
 import { useSearchParams, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { Scan, Permission, NetworkIndicator, Component } from '../lib/types'
+import { useUser } from '../lib/userContext'
+import { isAdmin } from '../lib/user'
 
 export default function ScanResult() {
   const [searchParams] = useSearchParams()
   const scanId = searchParams.get('id')
+  const { userId } = useUser()
+  const admin = isAdmin()
   const [scan, setScan] = useState<Scan | null>(null)
   const [permissions, setPermissions] = useState<Permission[]>([])
   const [networkIndicators, setNetworkIndicators] = useState<NetworkIndicator[]>([])
@@ -38,7 +42,14 @@ export default function ScanResult() {
         setLoading(false)
         return
       }
-      if (scanRes.data) setScan(scanRes.data)
+      if (scanRes.data) {
+        if (!admin && scanRes.data.user_id !== userId) {
+          setError('Access denied: this scan belongs to another user')
+          setLoading(false)
+          return
+        }
+        setScan(scanRes.data)
+      }
       if (permsRes.data) setPermissions(permsRes.data)
       if (networkRes.data) setNetworkIndicators(networkRes.data)
       if (compsRes.data) setComponents(compsRes.data)

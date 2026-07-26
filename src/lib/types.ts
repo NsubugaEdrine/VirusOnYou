@@ -12,6 +12,7 @@ export interface Scan {
   uploaded_at: string
   completed_at: string | null
   scan_types: string[]
+  user_id: string | null
 }
 
 export interface Device {
@@ -91,4 +92,38 @@ export interface DeviceScanSession {
   errorFiles: number
   files: DeviceScanFile[]
   status: 'idle' | 'selecting' | 'scanning' | 'complete'
+}
+
+export interface QuarantinedFile {
+  id: string
+  originalName: string
+  originalPath: string
+  sha256: string
+  threatLevel: 'Critical' | 'High' | 'Medium' | 'Low'
+  malwareName: string
+  detectedAt: string
+  size: number
+}
+
+export interface ProtectionEvent {
+  id: string
+  type: 'threat_blocked' | 'scan_complete' | 'device_detected' | 'device_removed' | 'quarantine' | 'update' | 'realtime_block'
+  title: string
+  description: string
+  severity: 'critical' | 'warning' | 'info' | 'success'
+  timestamp: string
+}
+
+export interface ThreatSignature {
+  sha256: string
+  malwareName: string
+  family: string
+  severity: 'Critical' | 'High' | 'Medium' | 'Low'
+}
+
+export interface UserProfile {
+  id: string
+  email: string | null
+  role: 'admin' | 'user'
+  created_at: string
 }

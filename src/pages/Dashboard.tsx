@@ -2,9 +2,12 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { Scan } from '../lib/types'
+import { useUser } from '../lib/userContext'
+import { isAdmin } from '../lib/user'
 
 export default function Dashboard() {
   const navigate = useNavigate()
+  const { userId, userIdShort, admin } = useUser()
   const [scans, setScans] = useState<Scan[]>([])
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState({ total: 0, critical: 0, pending: 0 })
@@ -12,19 +15,18 @@ export default function Dashboard() {
 
   useEffect(() => {
     const hour = new Date().getHours()
-    if (hour < 12) setGreeting('Good Morning, Analyst')
-    else if (hour < 18) setGreeting('Good Afternoon, Analyst')
-    else setGreeting('Night Watch: Dashboard Active')
+    if (hour < 12) setGreeting(admin ? 'Good Morning, Admin' : `Good Morning, User ${userIdShort}`)
+    else if (hour < 18) setGreeting(admin ? 'Good Afternoon, Admin' : `Good Afternoon, User ${userIdShort}`)
+    else setGreeting(admin ? 'Night Watch: Admin Active' : `Night Watch: User ${userIdShort}`)
     fetchData()
   }, [])
 
   async function fetchData() {
     setLoading(true)
     try {
-      const { data: allScans } = await supabase
-        .from('scans')
-        .select('*')
-        .order('uploaded_at', { ascending: false })
+      let query = supabase.from('scans').select('*').order('uploaded_at', { ascending: false })
+      if (!admin) query = query.eq('user_id', userId)
+      const { data: allScans } = await query
 
       if (allScans) {
         setScans(allScans)

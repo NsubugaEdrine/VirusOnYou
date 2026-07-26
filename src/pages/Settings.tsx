@@ -1,12 +1,17 @@
 import { useState } from 'react'
 import { useTheme } from '../lib/ThemeContext'
 import { supabase } from '../lib/supabase'
+import { useUser } from '../lib/userContext'
+import { isAdmin, adminLogin, adminLogout } from '../lib/user'
 
 export default function Settings() {
   const { theme, setTheme } = useTheme()
+  const { userId, userIdShort, admin, refreshAdmin } = useUser()
   const [scanTarget, setScanTarget] = useState<string>('all')
   const [scanning, setScanning] = useState(false)
   const [scanResult, setScanResult] = useState<string | null>(null)
+  const [adminPin, setAdminPin] = useState('')
+  const [adminError, setAdminError] = useState(false)
 
   async function handleFullScan() {
     setScanning(true)
@@ -43,6 +48,7 @@ export default function Settings() {
             risk_score: 0,
             risk_category: '',
             scan_types: ['Manifest Analysis', 'Permission Analysis', 'Code Analysis', 'Network Analysis'],
+            user_id: userId,
           })
         )
       )
@@ -207,6 +213,75 @@ export default function Settings() {
               </div>
             </div>
           )}
+        </section>
+
+        {/* Account */}
+        <section className="lg:col-span-6 glass-panel rounded-xl p-6">
+          <h3 className="font-headline-md text-headline-md text-on-surface mb-6 flex items-center gap-2">
+            <span className="material-symbols-outlined text-primary">person</span>
+            Account
+          </h3>
+
+          <div className="space-y-4">
+            <div className="p-4 bg-surface-container rounded-lg border border-outline-variant/50">
+              <p className="font-label-caps text-label-caps text-on-surface-variant mb-1">USER ID</p>
+              <p className="text-body-md text-on-surface font-code-sm break-all">{userId}</p>
+              <p className="text-[11px] text-on-surface-variant mt-1">This ID is stored locally in your browser and used to isolate your data.</p>
+            </div>
+
+            <div className="p-4 bg-surface-container rounded-lg border border-outline-variant/50">
+              <p className="font-label-caps text-label-caps text-on-surface-variant mb-1">STATUS</p>
+              <div className="flex items-center gap-2">
+                {admin ? (
+                  <>
+                    <span className="material-symbols-outlined text-error text-[18px]">admin_panel_settings</span>
+                    <p className="text-body-md text-error font-bold">Admin Mode Active</p>
+                  </>
+                ) : (
+                  <>
+                    <span className="material-symbols-outlined text-tertiary text-[18px]">person</span>
+                    <p className="text-body-md text-on-surface">Regular User</p>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {admin ? (
+              <button
+                onClick={() => { adminLogout(); refreshAdmin() }}
+                className="w-full py-3 rounded-xl bg-error/15 text-error border border-error/30 font-label-caps text-label-caps hover:bg-error/25 transition-all flex items-center justify-center gap-2"
+              >
+                <span className="material-symbols-outlined text-[18px]">logout</span>
+                Exit Admin Mode
+              </button>
+            ) : (
+              <div className="flex gap-2">
+                <input
+                  type="password"
+                  placeholder="Admin PIN"
+                  value={adminPin}
+                  onChange={(e) => { setAdminPin(e.target.value); setAdminError(false) }}
+                  className={`flex-1 bg-surface-container-lowest border rounded-lg px-3 py-2 text-sm focus:ring-1 outline-none transition-all ${
+                    adminError ? 'border-error focus:border-error focus:ring-error' : 'border-outline-variant focus:border-primary focus:ring-primary'
+                  }`}
+                />
+                <button
+                  onClick={() => {
+                    if (adminLogin(adminPin)) {
+                      refreshAdmin()
+                      setAdminPin('')
+                    } else {
+                      setAdminError(true)
+                    }
+                  }}
+                  disabled={adminPin.length < 4}
+                  className="px-4 py-2 rounded-lg bg-primary/15 text-primary border border-primary/30 font-label-caps text-label-caps hover:bg-primary/25 transition-all disabled:opacity-50"
+                >
+                  Login
+                </button>
+              </div>
+            )}
+          </div>
         </section>
 
         {/* About */}

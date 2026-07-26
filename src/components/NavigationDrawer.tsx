@@ -1,4 +1,5 @@
 import { NavLink } from 'react-router-dom'
+import { useUser } from '../lib/userContext'
 
 const navItems = [
   { to: '/dashboard', label: 'DASHBOARD', icon: 'dashboard' },
@@ -10,6 +11,8 @@ const navItems = [
 ]
 
 export default function NavigationDrawer() {
+  const { admin } = useUser()
+
   return (
     <aside className="hidden md:flex flex-col h-full z-40 pt-16 fixed left-0 top-0 w-[240px] bg-surface-container border-r border-outline-variant">
       <nav className="flex-1 py-6">
@@ -32,6 +35,25 @@ export default function NavigationDrawer() {
               <span className="font-label-caps text-label-caps">{item.label}</span>
             </NavLink>
           ))}
+
+          {admin && (
+            <>
+              <div className="border-t border-outline-variant my-3"></div>
+              <NavLink
+                to="/admin"
+                className={({ isActive }) =>
+                  `flex items-center gap-3 px-4 py-3 transition-all ${
+                    isActive
+                      ? 'text-error bg-error/10 border-r-2 border-error scale-[0.98]'
+                      : 'text-error/70 hover:bg-error/5 rounded-lg'
+                  }`
+                }
+              >
+                <span className="material-symbols-outlined">admin_panel_settings</span>
+                <span className="font-label-caps text-label-caps">ADMIN</span>
+              </NavLink>
+            </>
+          )}
         </div>
       </nav>
 

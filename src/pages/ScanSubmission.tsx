@@ -1,11 +1,13 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { useUser } from '../lib/userContext'
 
 type UploadState = 'idle' | 'processing' | 'ready'
 
 export default function ScanSubmission() {
   const navigate = useNavigate()
+  const { userId } = useUser()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [uploadState, setUploadState] = useState<UploadState>('idle')
@@ -65,6 +67,7 @@ export default function ScanSubmission() {
       risk_score: 0,
       risk_category: '',
       scan_types: ['Manifest Analysis', 'Permission Analysis', 'Code Analysis', 'Network Analysis'],
+      user_id: userId,
     })
 
     setSubmitting(false)

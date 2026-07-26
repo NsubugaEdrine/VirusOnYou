@@ -2,8 +2,11 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { Scan } from '../lib/types'
+import { useUser } from '../lib/userContext'
+import { isAdmin } from '../lib/user'
 
 export default function ScanHistory() {
+  const { userId, admin } = useUser()
   const [scans, setScans] = useState<Scan[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<Scan['threat_level'] | 'All'>('All')
@@ -16,7 +19,9 @@ export default function ScanHistory() {
 
   async function fetchCounts() {
     try {
-      const { data } = await supabase.from('scans').select('threat_level')
+      let query = supabase.from('scans').select('threat_level')
+      if (!admin) query = query.eq('user_id', userId)
+      const { data } = await query
       if (data) {
         const c: Record<string, number> = { All: data.length }
         data.forEach((s: { threat_level: string }) => { c[s.threat_level] = (c[s.threat_level] || 0) + 1 })
@@ -31,6 +36,7 @@ export default function ScanHistory() {
     setLoading(true)
     try {
       let query = supabase.from('scans').select('*').order('uploaded_at', { ascending: false })
+      if (!admin) query = query.eq('user_id', userId)
       if (filter !== 'All') query = query.eq('threat_level', filter)
       const { data } = await query
       if (data) setScans(data)

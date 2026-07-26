@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { useTheme } from '../lib/ThemeContext'
+import { useUser } from '../lib/userContext'
 
 export default function TopAppBar() {
   const [searchFocused, setSearchFocused] = useState(false)
   const { theme, setTheme } = useTheme()
+  const { userIdShort, admin } = useUser()
 
   return (
     <header className="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-margin h-16 bg-surface-container-low border-b border-outline-variant">
@@ -34,6 +36,14 @@ export default function TopAppBar() {
       </div>
 
       <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface-container border border-outline-variant text-on-surface-variant">
+          <span className="material-symbols-outlined text-[16px]">person</span>
+          <span className="font-code-sm text-xs">{userIdShort}</span>
+          {admin && (
+            <span className="px-1.5 py-0.5 bg-error/15 text-error border border-error/25 rounded-full font-label-caps text-[8px]">ADM</span>
+          )}
+        </div>
+
         <button
           onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
           className="relative p-2 text-on-surface-variant hover:bg-surface-variant rounded-full transition-colors"
