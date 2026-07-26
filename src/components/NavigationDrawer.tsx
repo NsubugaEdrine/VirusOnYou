@@ -4,6 +4,8 @@ import { useUser } from '../lib/userContext'
 const navItems = [
   { to: '/dashboard', label: 'DASHBOARD', icon: 'dashboard' },
   { to: '/scan-submission', label: 'NEW SCAN', icon: 'upload_file' },
+  { to: '/file-scanner', label: 'FILE SCANNER', icon: 'folder_open' },
+  { to: '/app-scanner', label: 'APP SCANNER', icon: 'phone_android' },
   { to: '/device-scan', label: 'DEVICE SCAN', icon: 'usb' },
   { to: '/scan-history', label: 'SCANS', icon: 'security' },
   { to: '/device-overview', label: 'DEVICES', icon: 'devices' },

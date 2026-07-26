@@ -119,6 +119,7 @@ export interface ThreatSignature {
   malwareName: string
   family: string
   severity: 'Critical' | 'High' | 'Medium' | 'Low'
+
 }
 
 export interface UserProfile {
@@ -126,4 +127,31 @@ export interface UserProfile {
   email: string | null
   role: 'admin' | 'user'
   created_at: string
+}
+
+export interface InstalledApp {
+  packageName: string
+  apkPath: string | null
+  size: number | null
+  status: 'pending' | 'scanning' | 'clean' | 'threat' | 'error'
+  sha256: string | null
+  riskScore: number
+  threatLevel: 'Critical' | 'High' | 'Medium' | 'Low' | 'None'
+  threatName: string | null
+  details: string
+}
+
+export interface FileScanResult {
+  id: string
+  name: string
+  path: string
+  size: number
+  category: string
+  sha256: string
+  status: 'pending' | 'scanning' | 'clean' | 'threat' | 'corrupted' | 'error'
+  threatLevel: 'Critical' | 'High' | 'Medium' | 'Low' | 'None'
+  threatName: string | null
+  riskScore: number
+  details: string
+  scannedAt: string | null
 }

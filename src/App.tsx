@@ -4,6 +4,8 @@ import Dashboard from './pages/Dashboard'
 import ScanSubmission from './pages/ScanSubmission'
 import DeviceOverview from './pages/DeviceOverview'
 import DeviceScan from './pages/DeviceScan'
+import FileScanner from './pages/FileScanner'
+import AppScanner from './pages/AppScanner'
 import ScanHistory from './pages/ScanHistory'
 import ThreatIntel from './pages/ThreatIntel'
 import ScanResult from './pages/ScanResult'
@@ -19,6 +21,8 @@ export default function App() {
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/scan-submission" element={<ScanSubmission />} />
+        <Route path="/file-scanner" element={<FileScanner />} />
+        <Route path="/app-scanner" element={<AppScanner />} />
         <Route path="/device-overview" element={<DeviceOverview />} />
         <Route path="/device-scan" element={<DeviceScan />} />
         <Route path="/scan-history" element={<ScanHistory />} />
