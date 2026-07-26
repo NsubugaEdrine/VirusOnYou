@@ -7,6 +7,7 @@ const navItems = [
   { to: '/file-scanner', label: 'FILE SCANNER', icon: 'folder_open' },
   { to: '/app-scanner', label: 'APP SCANNER', icon: 'phone_android' },
   { to: '/device-scan', label: 'DEVICE SCAN', icon: 'usb' },
+  { to: '/device-health', label: 'HEALTH SCAN', icon: 'health_and_safety' },
   { to: '/scan-history', label: 'SCANS', icon: 'security' },
   { to: '/device-overview', label: 'DEVICES', icon: 'devices' },
   { to: '/threat-intel', label: 'THREAT INTEL', icon: 'shield' },

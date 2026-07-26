@@ -5,6 +5,7 @@ const navItems = [
   { to: '/scan-submission', label: 'NEW', icon: 'upload_file' },
   { to: '/file-scanner', label: 'FILES', icon: 'folder_open' },
   { to: '/device-scan', label: 'SCAN DEV', icon: 'usb' },
+  { to: '/device-health', label: 'HEALTH', icon: 'health_and_safety' },
   { to: '/scan-history', label: 'SCANS', icon: 'security' },
   { to: '/settings', label: 'CONFIG', icon: 'settings' },
 ]

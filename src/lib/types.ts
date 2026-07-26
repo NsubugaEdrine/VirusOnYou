@@ -155,3 +155,30 @@ export interface FileScanResult {
   details: string
   scannedAt: string | null
 }
+
+export interface HealthFinding {
+  id: string
+  category: string
+  severity: 'critical' | 'warning' | 'info' | 'good'
+  title: string
+  description: string
+  recommendation: string
+}
+
+export interface HealthCategoryScore {
+  name: string
+  score: number
+  icon: string
+  color: string
+}
+
+export interface HealthScanReport {
+  id: string
+  overallScore: number
+  overallRating: 'Critical' | 'Poor' | 'Fair' | 'Good' | 'Excellent'
+  categories: HealthCategoryScore[]
+  findings: HealthFinding[]
+  systemInfo: Record<string, string>
+  scannedAt: string
+  userId: string
+}
