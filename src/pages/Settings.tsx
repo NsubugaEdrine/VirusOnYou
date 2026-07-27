@@ -68,17 +68,17 @@ export default function Settings() {
   }
 
   return (
-    <>
-      <div className="absolute -top-[20%] -right-[10%] w-[500px] h-[500px] bg-primary/5 rounded-full blur-[120px] pointer-events-none"></div>
+    <div className="relative w-full">
+      <div className="fixed -top-[20%] -right-[10%] w-[300px] h-[300px] md:w-[500px] md:h-[500px] bg-primary/5 rounded-full blur-[120px] pointer-events-none z-0"></div>
 
-      <header className="mb-8 relative">
+      <header className="mb-8 relative z-10">
         <h2 className="font-headline-lg text-headline-lg text-on-surface tracking-tight">Settings</h2>
         <p className="text-on-surface-variant text-body-md mt-1">
           Configure application preferences and fleet operations.
         </p>
       </header>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 relative max-w-4xl">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 relative z-10 max-w-full lg:max-w-4xl">
 
         {/* Appearance */}
         <section className="lg:col-span-6 glass-panel rounded-xl p-6">
@@ -306,6 +306,6 @@ export default function Settings() {
           </div>
         </section>
       </div>
-    </>
+    </div>
   )
 }
