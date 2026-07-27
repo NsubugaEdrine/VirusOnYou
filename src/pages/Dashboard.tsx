@@ -9,8 +9,8 @@ export default function Dashboard() {
   const { userId, userIdShort, admin } = useUser()
   const [scans, setScans] = useState<Scan[]>([])
   const [loading, setLoading] = useState(true)
-  const [stats, setStats] = useState({ total: 0, critical: 0, pending: 0 })
-  const [greeting, setGreeting] = useState('SOC Dashboard Overview')
+  const [stats, setStats] = useState({ total: 0, clean: 0, threats: 0, critical: 0 })
+  const [greeting, setGreeting] = useState('')
 
   useEffect(() => {
     const hour = new Date().getHours()
@@ -29,9 +29,11 @@ export default function Dashboard() {
 
       if (allScans) {
         setScans(allScans)
+        const completed = allScans.filter(s => s.status === 'Complete')
+        const clean = completed.filter(s => s.threat_level === 'None').length
+        const threats = completed.filter(s => s.threat_level !== 'None').length
         const critical = allScans.filter(s => s.threat_level === 'Critical').length
-        const pending = allScans.filter(s => s.status === 'In Progress' || s.status === 'Queued').length
-        setStats({ total: allScans.length, critical, pending })
+        setStats({ total: allScans.length, clean, threats, critical })
       }
     } catch {
       // UI stays with default empty stats
@@ -39,25 +41,40 @@ export default function Dashboard() {
     setLoading(false)
   }
 
-  const recentScans = scans.slice(0, 5)
+  const recentScans = scans.slice(0, 8)
 
-  const statusConfig: Record<string, { bg: string; text: string; border: string; dot: string; pulse?: boolean }> = {
-    Complete: { bg: 'bg-tertiary/15', text: 'text-tertiary', border: 'border-tertiary/30', dot: 'bg-tertiary', pulse: true },
-    'In Progress': { bg: 'bg-primary/15', text: 'text-primary', border: 'border-primary/30', dot: 'bg-primary', pulse: true },
-    Queued: { bg: 'bg-surface-variant', text: 'text-on-surface-variant', border: 'border-outline-variant', dot: '' },
-    Failed: { bg: 'bg-error/15', text: 'text-error', border: 'border-error/30', dot: '' },
+  const statusConfig: Record<string, { bg: string; text: string; dot: string; pulse?: boolean }> = {
+    Complete: { bg: 'bg-tertiary/15', text: 'text-tertiary', dot: 'bg-tertiary', pulse: true },
+    'In Progress': { bg: 'bg-primary/15', text: 'text-primary', dot: 'bg-primary', pulse: true },
+    Queued: { bg: 'bg-surface-variant', text: 'text-on-surface-variant', dot: '' },
+    Failed: { bg: 'bg-error/15', text: 'text-error', dot: '' },
   }
 
-  function getScoreDisplay(scan: Scan): string {
-    if (scan.status === 'Queued' || scan.status === 'In Progress') return '--'
-    return `${String(scan.risk_score).padStart(2, '0')}/100`
+  const threatConfig: Record<string, { bg: string; text: string }> = {
+    Critical: { bg: 'bg-error/15', text: 'text-error' },
+    High: { bg: 'bg-error/10', text: 'text-error' },
+    Medium: { bg: 'bg-secondary/15', text: 'text-secondary' },
+    Low: { bg: 'bg-tertiary/15', text: 'text-tertiary' },
+    None: { bg: 'bg-surface-variant', text: 'text-on-surface-variant' },
   }
 
-  function getScoreClass(scan: Scan): string {
+  function getScoreColor(scan: Scan): string {
     if (scan.status === 'Queued' || scan.status === 'In Progress') return 'text-on-surface-variant'
     if (scan.risk_score >= 75) return 'text-error'
-    if (scan.risk_score >= 50) return 'text-error'
-    return 'text-on-surface'
+    if (scan.risk_score >= 50) return 'text-secondary'
+    return 'text-tertiary'
+  }
+
+  function formatDate(dateStr: string): string {
+    const d = new Date(dateStr)
+    const now = new Date()
+    const diffMs = now.getTime() - d.getTime()
+    const diffMin = Math.floor(diffMs / 60000)
+    if (diffMin < 1) return 'Just now'
+    if (diffMin < 60) return `${diffMin}m ago`
+    const diffHr = Math.floor(diffMin / 60)
+    if (diffHr < 24) return `${diffHr}h ago`
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
   }
 
   if (loading) {
@@ -71,12 +88,46 @@ export default function Dashboard() {
     )
   }
 
+  const statCards = [
+    {
+      label: 'TOTAL SCANS',
+      value: stats.total,
+      icon: 'search',
+      iconBg: 'bg-primary/15',
+      iconText: 'text-primary',
+      valueClass: 'text-on-surface',
+    },
+    {
+      label: 'CLEAN',
+      value: stats.clean,
+      icon: 'verified',
+      iconBg: 'bg-tertiary/15',
+      iconText: 'text-tertiary',
+      valueClass: 'text-tertiary',
+    },
+    {
+      label: 'THREATS',
+      value: stats.threats,
+      icon: 'warning',
+      iconBg: 'bg-secondary/15',
+      iconText: 'text-secondary',
+      valueClass: 'text-secondary',
+    },
+    {
+      label: 'CRITICAL',
+      value: stats.critical,
+      icon: 'report',
+      iconBg: 'bg-error/15',
+      iconText: 'text-error',
+      valueClass: 'text-error',
+    },
+  ]
+
   return (
     <>
-      {/* Ambient glow */}
       <div className="absolute -top-[20%] -right-[10%] w-[500px] h-[500px] bg-primary/5 rounded-full blur-[120px] pointer-events-none"></div>
 
-      {/* Welcome Header */}
+      {/* Header */}
       <header className="mb-8 relative">
         <h2 className="font-headline-lg text-headline-lg text-on-surface tracking-tight">{greeting}</h2>
         <p className="text-on-surface-variant text-body-md mt-1">
@@ -84,63 +135,25 @@ export default function Dashboard() {
         </p>
       </header>
 
-      {/* Overview Bento Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        {/* Total Scans */}
-        <div className="bg-surface-container-high p-6 rounded-xl border border-outline-variant card-glow transition-all relative overflow-hidden">
-          <div className="absolute -top-8 -right-8 w-24 h-24 bg-primary/10 rounded-full blur-2xl"></div>
-          <div className="flex justify-between items-start mb-4 relative z-10">
-            <span className="p-2.5 rounded-xl bg-primary/15 text-primary material-symbols-outlined">search</span>
-            <span className="text-tertiary font-label-caps text-label-caps flex items-center gap-1">
-              <span className="material-symbols-outlined text-[14px]">trending_up</span>
-              +12%
-            </span>
+      {/* Stat Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8 relative">
+        {statCards.map((card) => (
+          <div key={card.label} className="bg-surface-container-high p-5 rounded-xl border border-outline-variant card-glow transition-all">
+            <div className="flex items-center gap-2 mb-4">
+              <span className={`p-2 rounded-lg ${card.iconBg} ${card.iconText} material-symbols-outlined text-[20px]`}>{card.icon}</span>
+              <span className="font-label-caps text-label-caps text-on-surface-variant">{card.label}</span>
+            </div>
+            <h3 className={`font-headline-lg text-headline-lg ${card.valueClass}`}>{card.value}</h3>
           </div>
-          <p className="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-widest mb-1 relative z-10">
-            Total Scans
-          </p>
-          <h3 className="font-headline-lg text-[32px] text-on-surface relative z-10">{stats.total}</h3>
-          <div className="w-full bg-surface-variant h-1 mt-4 rounded-full overflow-hidden relative z-10">
-            <div className="bg-gradient-to-r from-primary to-primary-container h-full w-[70%] rounded-full"></div>
-          </div>
-        </div>
-
-        {/* Critical Findings */}
-        <div className="bg-surface-container-high p-6 rounded-xl border border-error/30 card-glow transition-all relative overflow-hidden">
-          <div className="absolute -top-8 -right-8 w-32 h-32 bg-error/8 rounded-full blur-3xl"></div>
-          <div className="absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-error/50 via-error to-error/50"></div>
-          <div className="flex justify-between items-start mb-4 relative z-10">
-            <span className="p-2.5 rounded-xl bg-error/15 text-error material-symbols-outlined">report</span>
-            <span className="text-error font-label-caps text-label-caps bg-error/10 px-2 py-0.5 rounded-full">URGENT</span>
-          </div>
-          <p className="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-widest mb-1 relative z-10">
-            Critical Findings
-          </p>
-          <h3 className="font-headline-lg text-[32px] text-error relative z-10">{stats.critical}</h3>
-          <p className="text-on-surface-variant text-[12px] mt-4 relative z-10">
-            Requires immediate analyst intervention
-          </p>
-        </div>
-
-        {/* Pending Analysis */}
-        <div className="bg-surface-container-high p-6 rounded-xl border border-outline-variant card-glow transition-all relative overflow-hidden">
-          <div className="absolute -top-8 -right-8 w-24 h-24 bg-secondary/8 rounded-full blur-2xl"></div>
-          <div className="flex justify-between items-start mb-4 relative z-10">
-            <span className="p-2.5 rounded-xl bg-secondary/15 text-secondary material-symbols-outlined">hourglass_empty</span>
-          </div>
-          <p className="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-widest mb-1 relative z-10">
-            Pending Analysis
-          </p>
-          <h3 className="font-headline-lg text-[32px] text-on-surface relative z-10">{stats.pending}</h3>
-          <p className="text-on-surface-variant text-[12px] mt-4 relative z-10">Static/Dynamic sandbox queue active</p>
-        </div>
+        ))}
       </div>
 
-      {/* Content Area */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        {/* Recent Scans Table */}
-        <div className="lg:col-span-8 bg-surface-container-low rounded-xl border border-outline-variant flex flex-col overflow-hidden shadow-card">
-          <div className="p-5 border-b border-outline-variant flex justify-between items-center bg-surface-container">
+      {/* Main Content */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 relative">
+
+        {/* Recent Scans — 8 columns */}
+        <div className="lg:col-span-8 bg-surface-container rounded-xl border border-outline-variant flex flex-col overflow-hidden">
+          <div className="px-5 py-4 border-b border-outline-variant flex items-center justify-between">
             <h4 className="font-headline-md text-headline-md text-on-surface">Recent Scans</h4>
             <button
               onClick={() => navigate('/scan-history')}
@@ -149,108 +162,125 @@ export default function Dashboard() {
               VIEW ALL
             </button>
           </div>
-          <div className="overflow-x-auto custom-scrollbar">
-            <table className="w-full text-left border-collapse" aria-label="Recent scans">
-              <thead>
-                <tr className="bg-surface-container-high">
-                  <th className="px-6 py-4 font-label-caps text-label-caps text-on-surface-variant uppercase">APK Name</th>
-                  <th className="px-6 py-4 font-label-caps text-label-caps text-on-surface-variant uppercase text-center">Status</th>
-                  <th className="px-6 py-4 font-label-caps text-label-caps text-on-surface-variant uppercase text-right">Risk Score</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-outline-variant/50">
-                {recentScans.length === 0 ? (
-                  <tr><td colSpan={3} className="text-center text-on-surface-variant py-8">No data found</td></tr>
-                ) : (
-                  recentScans.map((scan) => {
+
+          {recentScans.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-on-surface-variant">
+              <span className="material-symbols-outlined text-4xl mb-3 text-outline-variant">folder_open</span>
+              <p className="text-body-md">No scans yet</p>
+              <p className="text-xs text-outline mt-1">Submit your first scan to get started</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto custom-scrollbar">
+              <table className="w-full text-left border-collapse" aria-label="Recent scans">
+                <thead>
+                  <tr className="bg-surface-container-high">
+                    <th className="px-5 py-3 font-label-caps text-label-caps text-on-surface-variant">FILE NAME</th>
+                    <th className="px-5 py-3 font-label-caps text-label-caps text-on-surface-variant text-center">STATUS</th>
+                    <th className="px-5 py-3 font-label-caps text-label-caps text-on-surface-variant text-center">THREAT</th>
+                    <th className="px-5 py-3 font-label-caps text-label-caps text-on-surface-variant text-right">SCORE</th>
+                    <th className="px-5 py-3 font-label-caps text-label-caps text-on-surface-variant text-right">TIME</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-outline-variant/50">
+                  {recentScans.map((scan) => {
                     const sc = statusConfig[scan.status] || statusConfig.Queued
+                    const tc = threatConfig[scan.threat_level] || threatConfig.None
                     return (
-                      <tr key={scan.id} className="hover:bg-surface-variant/30 transition-colors cursor-pointer" onClick={() => navigate(`/scan-result?id=${scan.id}`)}>
-                        <td className="px-6 py-4 font-code-sm text-code-sm text-primary">{scan.file_name}</td>
-                        <td className="px-6 py-4 text-center">
-                          <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full ${sc.bg} ${sc.text} text-[11px] font-bold border ${sc.border}`}>
+                      <tr key={scan.id} className="hover:bg-surface-variant/20 transition-colors cursor-pointer" onClick={() => navigate(`/scan-result?id=${scan.id}`)}>
+                        <td className="px-5 py-3">
+                          <span className="font-code-sm text-code-sm text-primary truncate block max-w-[200px]">{scan.file_name}</span>
+                        </td>
+                        <td className="px-5 py-3 text-center">
+                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold ${sc.bg} ${sc.text}`}>
                             {sc.dot && <span className={`w-1.5 h-1.5 rounded-full ${sc.dot}${sc.pulse ? ' animate-pulse' : ''}`}></span>}
-                            {scan.status.toUpperCase()}
+                            {scan.status === 'In Progress' ? 'SCANNING' : scan.status.toUpperCase()}
                           </span>
                         </td>
-                        <td className={`px-6 py-4 text-right font-bold ${getScoreClass(scan)}`}>{getScoreDisplay(scan)}</td>
+                        <td className="px-5 py-3 text-center">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${tc.bg} ${tc.text}`}>
+                            {scan.threat_level.toUpperCase()}
+                          </span>
+                        </td>
+                        <td className={`px-5 py-3 text-right font-code-sm text-code-sm font-bold ${getScoreColor(scan)}`}>
+                          {scan.status === 'Queued' || scan.status === 'In Progress' ? '--' : `${scan.risk_score}/100`}
+                        </td>
+                        <td className="px-5 py-3 text-right text-xs text-on-surface-variant">
+                          {formatDate(scan.uploaded_at)}
+                        </td>
                       </tr>
                     )
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
 
-        {/* Activity Feed */}
-        <div className="lg:col-span-4 bg-surface-container-low rounded-xl border border-outline-variant overflow-hidden flex flex-col shadow-card">
-          <div className="p-5 border-b border-outline-variant bg-surface-container">
-            <h4 className="font-headline-md text-headline-md text-on-surface">Recent Activity</h4>
-          </div>
-          <div className="flex-1 p-6 space-y-6 overflow-y-auto custom-scrollbar">
-            {[
-              { icon: 'warning', bg: 'bg-error/15', text: 'text-error', title: 'New malicious APK detected', desc: 'Device-902 flagged suspicious activity during run-time.', time: '2 MINS AGO' },
-              { icon: 'check_circle', bg: 'bg-tertiary/15', text: 'text-tertiary', title: 'Scheduled scan completed', desc: 'All fleet devices (14/14) reported as secure.', time: '1 HOUR AGO' },
-              { icon: 'sync', bg: 'bg-primary/15', text: 'text-primary', title: 'Threat database updated', desc: 'Version 4.5.12 applied with 142 new signatures.', time: '4 HOURS AGO' },
-              { icon: 'person', bg: 'bg-secondary/15', text: 'text-secondary', title: 'New login detected', desc: 'Analyst Level 1 (ID: 04) logged in from 192.168.1.104', time: '6 HOURS AGO' },
-            ].map((item, i) => (
-              <div key={i} className="flex gap-4 relative">
-                {i < 3 && <div className="absolute left-4 top-10 bottom-0 w-[1px] bg-outline-variant/30"></div>}
-                <div className={`w-8 h-8 rounded-full ${item.bg} ${item.text} flex items-center justify-center shrink-0`}>
-                  <span className="material-symbols-outlined text-[18px]">{item.icon}</span>
-                </div>
-                <div>
-                  <p className="text-body-md font-bold text-on-surface">{item.title}</p>
-                  <p className="text-[12px] text-on-surface-variant mt-1">{item.desc}</p>
-                  <span className="text-[10px] text-outline font-label-caps mt-2 block">{item.time}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Threat Trajectory Chart */}
-      <div className="mt-8 bg-surface-container p-6 rounded-xl border border-outline-variant relative h-64 overflow-hidden shadow-card">
-        <div className="absolute -top-16 -right-16 w-40 h-40 bg-primary/5 rounded-full blur-3xl pointer-events-none"></div>
-        <div className="flex justify-between items-center mb-6 relative z-10">
-          <h4 className="font-headline-md text-headline-md text-on-surface">Threat Trajectory</h4>
-          <div className="flex gap-3 items-center">
-            <div className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-primary"></span>
-              <span className="font-label-caps text-[10px] text-on-surface-variant uppercase">Normal</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-error"></span>
-              <span className="font-label-caps text-[10px] text-on-surface-variant uppercase">Threats</span>
-            </div>
-          </div>
-        </div>
-        <div className="absolute bottom-0 left-0 w-full h-32 px-6">
-          <div className="flex items-end justify-between h-full gap-1.5" role="img" aria-label="Threat trajectory bar chart">
-            {[
-              { h: '20%', c: 'bg-surface-variant hover:bg-surface-variant/80' },
-              { h: '35%', c: 'bg-surface-variant hover:bg-surface-variant/80' },
-              { h: '50%', c: 'bg-primary/60 hover:bg-primary/80' },
-              { h: '45%', c: 'bg-surface-variant hover:bg-surface-variant/80' },
-              { h: '60%', c: 'bg-primary/70 hover:bg-primary/90' },
-              { h: '30%', c: 'bg-surface-variant hover:bg-surface-variant/80' },
-              { h: '85%', c: 'bg-gradient-to-t from-error to-error/70', spike: true },
-              { h: '40%', c: 'bg-surface-variant hover:bg-surface-variant/80' },
-              { h: '25%', c: 'bg-surface-variant hover:bg-surface-variant/80' },
-              { h: '55%', c: 'bg-primary/60 hover:bg-primary/80' },
-              { h: '45%', c: 'bg-surface-variant hover:bg-surface-variant/80' },
-              { h: '70%', c: 'bg-primary/70 hover:bg-primary/90' },
-            ].map((bar, i) => (
-              <div key={i} className={`w-full ${bar.c} rounded-t-sm transition-all cursor-pointer relative group`} style={{ height: bar.h }}>
-                {bar.spike && (
-                  <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-error text-on-error font-code-sm text-[10px] px-2.5 py-0.5 rounded-full shadow-glow-error whitespace-nowrap">
-                    SPIKE
+        {/* Quick Actions — 4 columns */}
+        <div className="lg:col-span-4 flex flex-col gap-6">
+          {/* Quick Actions */}
+          <div className="bg-surface-container rounded-xl border border-outline-variant p-5">
+            <h4 className="font-headline-md text-headline-md text-on-surface mb-4">Quick Actions</h4>
+            <div className="space-y-3">
+              {[
+                { icon: 'upload_file', label: 'New Scan', desc: 'Submit a file for analysis', to: '/scan-submission', iconBg: 'bg-primary/15', iconText: 'text-primary' },
+                { icon: 'folder_open', label: 'File Scanner', desc: 'Batch scan local files', to: '/file-scanner', iconBg: 'bg-secondary/15', iconText: 'text-secondary' },
+                { icon: 'phone_android', label: 'App Scanner', desc: 'Scan installed apps via ADB', to: '/app-scanner', iconBg: 'bg-tertiary/15', iconText: 'text-tertiary' },
+                { icon: 'health_and_safety', label: 'Health Scan', desc: 'Device security audit', to: '/device-health', iconBg: 'bg-error/15', iconText: 'text-error' },
+              ].map((action) => (
+                <button
+                  key={action.to}
+                  onClick={() => navigate(action.to)}
+                  className="w-full flex items-center gap-3 p-3 rounded-xl bg-surface-container-high border border-outline-variant hover:border-primary/30 hover:bg-primary/5 transition-all text-left group"
+                >
+                  <span className={`p-2 rounded-lg ${action.iconBg} ${action.iconText} material-symbols-outlined text-[20px] group-hover:scale-110 transition-transform`}>{action.icon}</span>
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold text-on-surface group-hover:text-primary transition-colors">{action.label}</p>
+                    <p className="text-xs text-on-surface-variant truncate">{action.desc}</p>
                   </div>
-                )}
+                  <span className="material-symbols-outlined text-on-surface-variant ml-auto text-[18px] group-hover:text-primary group-hover:translate-x-0.5 transition-all">arrow_forward</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* System Status */}
+          <div className="bg-surface-container rounded-xl border border-outline-variant p-5">
+            <h4 className="font-headline-md text-headline-md text-on-surface mb-4">System Status</h4>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-tertiary animate-pulse"></span>
+                  <span className="text-sm text-on-surface">Database</span>
+                </div>
+                <span className="text-xs font-bold text-tertiary">Online</span>
               </div>
-            ))}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
+                  <span className="text-sm text-on-surface">Scan Engine</span>
+                </div>
+                <span className="text-xs font-bold text-primary">Ready</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className={`w-2 h-2 rounded-full ${stats.critical > 0 ? 'bg-error animate-pulse' : 'bg-tertiary'}`}></span>
+                  <span className="text-sm text-on-surface">Threat Level</span>
+                </div>
+                <span className={`text-xs font-bold ${stats.critical > 0 ? 'text-error' : 'text-tertiary'}`}>
+                  {stats.critical > 0 ? `${stats.critical} Critical` : 'All Clear'}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-surface-variant"></span>
+                  <span className="text-sm text-on-surface">Pending Scans</span>
+                </div>
+                <span className="text-xs font-bold text-on-surface-variant">
+                  {scans.filter(s => s.status === 'In Progress' || s.status === 'Queued').length}
+                </span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
