@@ -137,8 +137,8 @@ export default function Dashboard() {
 
       {/* Stat Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8 relative">
-        {statCards.map((card) => (
-          <div key={card.label} className="bg-surface-container-high p-5 rounded-xl border border-outline-variant card-glow transition-all">
+        {statCards.map((card, i) => (
+          <div key={card.label} className="md3-card-elevated p-5 animate-md3-fade-in" style={{ animationDelay: `${i * 60}ms` }}>
             <div className="flex items-center gap-2 mb-4">
               <span className={`p-2 rounded-lg ${card.iconBg} ${card.iconText} material-symbols-outlined text-[20px]`}>{card.icon}</span>
               <span className="font-label-caps text-label-caps text-on-surface-variant">{card.label}</span>
@@ -152,12 +152,12 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 relative">
 
         {/* Recent Scans — 8 columns */}
-        <div className="lg:col-span-8 bg-surface-container rounded-xl border border-outline-variant flex flex-col overflow-hidden">
-          <div className="px-5 py-4 border-b border-outline-variant flex items-center justify-between">
+        <div className="lg:col-span-8 md3-card overflow-hidden flex flex-col animate-md3-fade-in" style={{ animationDelay: '240ms' }}>
+          <div className="px-5 py-4 border-b border-outline-variant/50 flex items-center justify-between">
             <h4 className="font-headline-md text-headline-md text-on-surface">Recent Scans</h4>
             <button
               onClick={() => navigate('/scan-history')}
-              className="text-primary font-label-caps text-label-caps hover:text-primary-container transition-colors"
+              className="md3-btn-text text-[11px] h-8 px-3"
             >
               VIEW ALL
             </button>
@@ -219,9 +219,9 @@ export default function Dashboard() {
         {/* Quick Actions — 4 columns */}
         <div className="lg:col-span-4 flex flex-col gap-6">
           {/* Quick Actions */}
-          <div className="bg-surface-container rounded-xl border border-outline-variant p-5">
+          <div className="md3-card p-5 animate-md3-fade-in" style={{ animationDelay: '300ms' }}>
             <h4 className="font-headline-md text-headline-md text-on-surface mb-4">Quick Actions</h4>
-            <div className="space-y-3">
+            <div className="space-y-2">
               {[
                 { icon: 'upload_file', label: 'New Scan', desc: 'Submit a file for analysis', to: '/scan-submission', iconBg: 'bg-primary/15', iconText: 'text-primary' },
                 { icon: 'folder_open', label: 'File Scanner', desc: 'Batch scan local files', to: '/file-scanner', iconBg: 'bg-secondary/15', iconText: 'text-secondary' },
@@ -231,21 +231,21 @@ export default function Dashboard() {
                 <button
                   key={action.to}
                   onClick={() => navigate(action.to)}
-                  className="w-full flex items-center gap-3 p-3 rounded-xl bg-surface-container-high border border-outline-variant hover:border-primary/30 hover:bg-primary/5 transition-all text-left group"
+                  className="w-full flex items-center gap-3 p-3 rounded-2xl md3-state-layer text-on-surface hover:bg-surface-container-high transition-all text-left group"
                 >
-                  <span className={`p-2 rounded-lg ${action.iconBg} ${action.iconText} material-symbols-outlined text-[20px] group-hover:scale-110 transition-transform`}>{action.icon}</span>
-                  <div className="min-w-0">
-                    <p className="text-sm font-bold text-on-surface group-hover:text-primary transition-colors">{action.label}</p>
+                  <span className={`p-2 rounded-xl ${action.iconBg} ${action.iconText} material-symbols-outlined text-[20px]`}>{action.icon}</span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-on-surface group-hover:text-primary transition-colors">{action.label}</p>
                     <p className="text-xs text-on-surface-variant truncate">{action.desc}</p>
                   </div>
-                  <span className="material-symbols-outlined text-on-surface-variant ml-auto text-[18px] group-hover:text-primary group-hover:translate-x-0.5 transition-all">arrow_forward</span>
+                  <span className="material-symbols-outlined text-on-surface-variant text-[18px] group-hover:text-primary group-hover:translate-x-0.5 transition-all">arrow_forward</span>
                 </button>
               ))}
             </div>
           </div>
 
           {/* System Status */}
-          <div className="bg-surface-container rounded-xl border border-outline-variant p-5">
+          <div className="md3-card p-5 animate-md3-fade-in" style={{ animationDelay: '360ms' }}>
             <h4 className="font-headline-md text-headline-md text-on-surface mb-4">System Status</h4>
             <div className="space-y-4">
               <div className="flex items-center justify-between">
