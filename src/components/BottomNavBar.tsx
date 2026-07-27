@@ -1,11 +1,16 @@
 import { NavLink } from 'react-router-dom'
+import DashboardRoundedIcon from '@mui/icons-material/DashboardRounded'
+import ShieldRoundedIcon from '@mui/icons-material/ShieldRounded'
+import DevicesRoundedIcon from '@mui/icons-material/DevicesRounded'
+import PolicyRoundedIcon from '@mui/icons-material/PolicyRounded'
+import SettingsRoundedIcon from '@mui/icons-material/SettingsRounded'
 
 const navItems = [
-  { to: '/dashboard', label: 'DASHBOARD', icon: 'dashboard' },
-  { to: '/scan-history', label: 'SCANS', icon: 'security' },
-  { to: '/device-overview', label: 'DEVICES', icon: 'devices' },
-  { to: '/threat-intel', label: 'INTEL', icon: 'drive_file_rename' },
-  { to: '/settings', label: 'SETTINGS', icon: 'settings' },
+  { to: '/dashboard', label: 'DASHBOARD', Icon: DashboardRoundedIcon },
+  { to: '/scan-history', label: 'SCANS', Icon: ShieldRoundedIcon },
+  { to: '/device-overview', label: 'DEVICES', Icon: DevicesRoundedIcon },
+  { to: '/threat-intel', label: 'INTEL', Icon: PolicyRoundedIcon },
+  { to: '/settings', label: 'SETTINGS', Icon: SettingsRoundedIcon },
 ]
 
 export default function BottomNavBar() {
@@ -25,9 +30,7 @@ export default function BottomNavBar() {
         >
           {({ isActive }) => (
             <>
-              <span className="material-symbols-outlined" style={isActive ? { fontVariationSettings: "'FILL' 1" } : {}}>
-                {item.icon}
-              </span>
+              <item.Icon sx={{ fontSize: 24, color: isActive ? 'rgb(var(--color-primary))' : undefined }} />
               <span className="font-label-caps text-[9px] mt-1">{item.label}</span>
             </>
           )}

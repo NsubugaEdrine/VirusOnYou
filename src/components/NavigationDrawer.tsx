@@ -1,11 +1,17 @@
 import { NavLink } from 'react-router-dom'
 import { useUser } from '../lib/userContext'
+import DashboardRoundedIcon from '@mui/icons-material/DashboardRounded'
+import ShieldRoundedIcon from '@mui/icons-material/ShieldRounded'
+import DevicesRoundedIcon from '@mui/icons-material/DevicesRounded'
+import PolicyRoundedIcon from '@mui/icons-material/PolicyRounded'
+import AdminPanelSettingsRoundedIcon from '@mui/icons-material/AdminPanelSettingsRounded'
+import SettingsRoundedIcon from '@mui/icons-material/SettingsRounded'
 
 const navItems = [
-  { to: '/dashboard', label: 'DASHBOARD', icon: 'dashboard' },
-  { to: '/scan-history', label: 'SCANS', icon: 'security' },
-  { to: '/device-overview', label: 'DEVICES', icon: 'devices' },
-  { to: '/threat-intel', label: 'THREAT INTEL', icon: 'drive_file_rename' },
+  { to: '/dashboard', label: 'DASHBOARD', Icon: DashboardRoundedIcon },
+  { to: '/scan-history', label: 'SCANS', Icon: ShieldRoundedIcon },
+  { to: '/device-overview', label: 'DEVICES', Icon: DevicesRoundedIcon },
+  { to: '/threat-intel', label: 'THREAT INTEL', Icon: PolicyRoundedIcon },
 ]
 
 export default function NavigationDrawer() {
@@ -27,9 +33,7 @@ export default function NavigationDrawer() {
                 }`
               }
             >
-              <span className="material-symbols-outlined">
-                {item.icon}
-              </span>
+              <item.Icon sx={{ fontSize: 24 }} />
               <span className="font-label-caps text-label-caps">{item.label}</span>
             </NavLink>
           ))}
@@ -45,7 +49,7 @@ export default function NavigationDrawer() {
                 }`
               }
             >
-              <span className="material-symbols-outlined">admin_panel_settings</span>
+              <AdminPanelSettingsRoundedIcon sx={{ fontSize: 24 }} />
               <span className="font-label-caps text-label-caps">ADMIN</span>
             </NavLink>
           )}
@@ -63,7 +67,7 @@ export default function NavigationDrawer() {
             }`
           }
         >
-          <span className="material-symbols-outlined">settings</span>
+          <SettingsRoundedIcon sx={{ fontSize: 24 }} />
           <span className="font-label-caps text-label-caps">SETTINGS</span>
         </NavLink>
       </div>
