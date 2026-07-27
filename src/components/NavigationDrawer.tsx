@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import { NavLink } from 'react-router-dom'
 import { useUser } from '../lib/userContext'
 
@@ -15,9 +16,23 @@ const navItems = [
 
 export default function NavigationDrawer() {
   const { admin } = useUser()
+  const asideRef = useRef<HTMLElement>(null)
+  const settingsRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const aside = asideRef.current
+    const settings = settingsRef.current
+    if (!aside || !settings) return
+    const asideRect = aside.getBoundingClientRect()
+    const settingsRect = settings.getBoundingClientRect()
+    const styles = getComputedStyle(aside)
+    // #region agent log
+    fetch('http://127.0.0.1:7542/ingest/63a7cef4-3441-4b2c-b41f-ae792e84b7b4',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'d394df'},body:JSON.stringify({sessionId:'d394df',location:'NavigationDrawer.tsx:mount',message:'sidebar layout metrics',data:{viewportW:window.innerWidth,viewportH:window.innerHeight,asideH:asideRect.height,asideDisplay:styles.display,settingsTop:settingsRect.top,settingsBottom:settingsRect.bottom,settingsVisible:settingsRect.bottom<=window.innerHeight&&settingsRect.top>=0,mdBreakpoint:window.matchMedia('(min-width:768px)').matches},timestamp:Date.now(),hypothesisId:'H1-H2-H3'})}).catch(()=>{});
+    // #endregion
+  }, [])
 
   return (
-    <aside className="hidden md:flex flex-col h-full z-40 pt-16 fixed left-0 top-0 w-[240px] bg-surface-container border-r border-outline-variant">
+    <aside ref={asideRef} className="hidden md:flex flex-col h-full z-40 pt-16 fixed left-0 top-0 w-[240px] bg-surface-container border-r border-outline-variant">
       <nav className="flex-1 py-6">
         <div className="space-y-1 px-3">
           {navItems.map((item) => (
@@ -60,7 +75,7 @@ export default function NavigationDrawer() {
         </div>
       </nav>
 
-      <div className="p-6 mt-auto border-t border-outline-variant">
+      <div ref={settingsRef} className="p-6 mt-auto border-t border-outline-variant shrink-0">
         <NavLink
           to="/settings"
           className={({ isActive }) =>

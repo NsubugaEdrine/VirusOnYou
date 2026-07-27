@@ -13,7 +13,16 @@ export default function TopAppBar() {
         <button className="md3-icon-btn md3-state-layer text-on-surface-variant" aria-label="Open menu">
           <span className="material-symbols-outlined">menu</span>
         </button>
-        <img src="/favicon.png" alt="VirusOnYou" className="w-8 h-8 rounded-xl object-cover shrink-0" />
+        <img
+          src="/favicon.png"
+          alt="VirusOnYou"
+          className="w-8 h-8 rounded-xl object-cover shrink-0"
+          onError={() => {
+            // #region agent log
+            fetch('http://127.0.0.1:7542/ingest/63a7cef4-3441-4b2c-b41f-ae792e84b7b4',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'d394df'},body:JSON.stringify({sessionId:'d394df',location:'TopAppBar.tsx:favicon',message:'favicon failed to load',data:{src:'/favicon.png'},timestamp:Date.now(),hypothesisId:'H6'})}).catch(()=>{});
+            // #endregion
+          }}
+        />
         <h1 className="font-headline-md text-headline-md font-bold text-primary tracking-tight hidden sm:block whitespace-nowrap">
           VirusOnYou
         </h1>

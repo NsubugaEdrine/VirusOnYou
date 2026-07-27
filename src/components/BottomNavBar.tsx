@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { NavLink } from 'react-router-dom'
 
 const navItems = [
@@ -9,6 +10,14 @@ const navItems = [
 ]
 
 export default function BottomNavBar() {
+  useEffect(() => {
+    const nav = document.querySelector('[aria-label="Mobile navigation"]')
+    const styles = nav ? getComputedStyle(nav) : null
+    // #region agent log
+    fetch('http://127.0.0.1:7542/ingest/63a7cef4-3441-4b2c-b41f-ae792e84b7b4',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'d394df'},body:JSON.stringify({sessionId:'d394df',location:'BottomNavBar.tsx:mount',message:'mobile nav visibility',data:{viewportW:window.innerWidth,display:styles?.display,mdHidden:window.matchMedia('(min-width:768px)').matches},timestamp:Date.now(),hypothesisId:'H3'})}).catch(()=>{});
+    // #endregion
+  }, [])
+
   return (
     <nav className="fixed bottom-0 left-0 w-full z-50 flex md:hidden justify-around items-center px-1 py-1 pb-[env(safe-area-inset-bottom,0px)] bg-surface-container-high border-t border-outline-variant/50" aria-label="Mobile navigation">
       {navItems.map((item) => (

@@ -21,7 +21,11 @@ export function UserProvider({ children }: { children: ReactNode }) {
   const [admin, setAdmin] = useState(checkAdmin)
 
   function refreshAdmin() {
-    setAdmin(checkAdmin())
+    const next = checkAdmin()
+    // #region agent log
+    fetch('http://127.0.0.1:7542/ingest/63a7cef4-3441-4b2c-b41f-ae792e84b7b4',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'d394df'},body:JSON.stringify({sessionId:'d394df',location:'userContext.tsx:refreshAdmin',message:'refreshAdmin',data:{prevAdmin:admin,nextAdmin:next},timestamp:Date.now(),hypothesisId:'H5'})}).catch(()=>{});
+    // #endregion
+    setAdmin(next)
   }
 
   return (
