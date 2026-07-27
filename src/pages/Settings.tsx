@@ -69,7 +69,7 @@ export default function Settings() {
 
   return (
     <div className="relative w-full">
-      <div className="fixed -top-[20%] -right-[10%] w-[300px] h-[300px] md:w-[500px] md:h-[500px] bg-primary/5 rounded-full blur-[120px] pointer-events-none z-0"></div>
+      <div className="absolute -top-[20%] -right-[10%] w-[300px] h-[300px] md:w-[500px] md:h-[500px] bg-primary/5 rounded-full blur-[120px] pointer-events-none z-0"></div>
 
       <header className="mb-8 relative z-10">
         <h2 className="font-headline-lg text-headline-lg text-on-surface tracking-tight">Settings</h2>

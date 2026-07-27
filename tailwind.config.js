@@ -63,6 +63,11 @@ export default {
       fontFamily: {
         "headline-lg": ["Inter"],
         "headline-md": ["Inter"],
+        "headline-large": ["Inter"],
+        "title-large": ["Inter"],
+        "display-small": ["Inter"],
+        "display-medium": ["Inter"],
+        "display-large": ["Inter"],
         "code-sm": ["JetBrains Mono"],
         "body-md": ["Inter"],
         "label-caps": ["Inter"],
@@ -70,6 +75,11 @@ export default {
       fontSize: {
         "headline-lg": ["28px", { lineHeight: "36px", letterSpacing: "-0.02em", fontWeight: "700" }],
         "headline-md": ["20px", { lineHeight: "28px", letterSpacing: "-0.01em", fontWeight: "600" }],
+        "headline-large": ["32px", { lineHeight: "40px", letterSpacing: "-0.02em", fontWeight: "700" }],
+        "title-large": ["22px", { lineHeight: "28px", letterSpacing: "0", fontWeight: "500" }],
+        "display-small": ["36px", { lineHeight: "44px", letterSpacing: "-0.02em", fontWeight: "700" }],
+        "display-medium": ["45px", { lineHeight: "52px", letterSpacing: "-0.02em", fontWeight: "700" }],
+        "display-large": ["57px", { lineHeight: "64px", letterSpacing: "-0.02em", fontWeight: "700" }],
         "code-sm": ["12px", { lineHeight: "16px", fontWeight: "500" }],
         "body-md": ["14px", { lineHeight: "20px", fontWeight: "400" }],
         "label-caps": ["11px", { lineHeight: "16px", letterSpacing: "0.05em", fontWeight: "700" }],

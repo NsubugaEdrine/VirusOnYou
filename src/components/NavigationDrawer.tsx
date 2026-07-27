@@ -27,7 +27,7 @@ export default function NavigationDrawer() {
               className={({ isActive }) =>
                 `flex items-center gap-3 px-4 py-3 transition-all ${
                   isActive
-                    ? 'text-primary bg-primary-container/10 border-r-2 border-primary scale-[0.98]'
+                    ? 'text-primary bg-primary-container/10 border-r-2 border-primary rounded-none'
                     : 'text-on-surface-variant hover:bg-surface-variant rounded-lg'
                 }`
               }
@@ -47,7 +47,7 @@ export default function NavigationDrawer() {
                 className={({ isActive }) =>
                   `flex items-center gap-3 px-4 py-3 transition-all ${
                     isActive
-                      ? 'text-error bg-error/10 border-r-2 border-error scale-[0.98]'
+                      ? 'text-error bg-error/10 border-r-2 border-error rounded-none'
                       : 'text-error/70 hover:bg-error/5 rounded-lg'
                   }`
                 }

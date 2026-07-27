@@ -11,7 +11,7 @@ function ScoreRing({ score, size = 160, stroke = 10 }: { score: number; size?: n
   const radius = (size - stroke) / 2
   const circumference = 2 * Math.PI * radius
   const offset = circumference - (score / 100) * circumference
-  const color = score >= 80 ? 'var(--color-tertiary)' : score >= 60 ? 'var(--color-secondary)' : score >= 40 ? 'var(--color-orange-500)' : 'var(--color-error)'
+  const color = score >= 80 ? 'var(--color-tertiary)' : score >= 60 ? 'var(--color-secondary)' : score >= 40 ? 'var(--color-secondary)' : 'var(--color-error)'
 
   return (
     <div className="relative" style={{ width: size, height: size }}>
@@ -44,7 +44,7 @@ function CategoryBar({ name, score, icon, color }: { name: string; score: number
 function SeverityIcon({ severity }: { severity: HealthFinding['severity'] }) {
   const map = {
     critical: { icon: 'error', color: 'text-error' },
-    warning: { icon: 'warning', color: 'text-orange-500' },
+    warning: { icon: 'warning', color: 'text-secondary' },
     info: { icon: 'info', color: 'text-primary' },
     good: { icon: 'check_circle', color: 'text-tertiary' },
   }
@@ -171,7 +171,7 @@ export default function DeviceHealthScan() {
 
         <button
           onClick={startScan}
-          className="w-full py-4 bg-primary text-on-primary rounded-xl font-label-caps text-label-caps hover:bg-primary-hover transition-all shadow-md hover:shadow-lg active:scale-[0.98] flex items-center justify-center gap-2"
+          className="w-full py-4 bg-primary text-on-primary rounded-xl font-label-caps text-label-caps hover:bg-primary/90 transition-all shadow-md hover:shadow-lg active:scale-[0.98] flex items-center justify-center gap-2"
         >
           <span className="material-symbols-outlined">play_arrow</span>
           BEGIN HEALTH SCAN
@@ -215,7 +215,7 @@ export default function DeviceHealthScan() {
     const overallPercent = Math.round(((currentIdx * 100 + progress.percent) / (allPhases.length * 100)) * 100)
 
     return (
-      <div className="max-w-xl mx-auto px-4 py-16 space-y-8 flex flex-col items-center">
+      <div className="max-w-2xl mx-auto px-4 py-16 space-y-8 flex flex-col items-center">
         <div className="w-24 h-24 rounded-full bg-primary-container flex items-center justify-center animate-pulse">
           <span className="material-symbols-outlined text-5xl text-primary">health_and_safety</span>
         </div>
@@ -264,7 +264,7 @@ export default function DeviceHealthScan() {
   const severityFilters: Array<{ key: FindingFilter; label: string; count: number; color: string }> = [
     { key: 'all', label: 'ALL', count: findingCounts.all, color: 'bg-surface-variant text-on-surface' },
     { key: 'critical', label: 'CRITICAL', count: findingCounts.critical, color: 'bg-error-container text-on-error-container' },
-    { key: 'warning', label: 'WARNINGS', count: findingCounts.warning, color: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-100' },
+    { key: 'warning', label: 'WARNINGS', count: findingCounts.warning, color: 'bg-secondary-container text-on-secondary-container' },
     { key: 'info', label: 'INFO', count: findingCounts.info, color: 'bg-primary-container text-on-primary-container' },
     { key: 'good', label: 'GOOD', count: findingCounts.good, color: 'bg-tertiary-container text-on-tertiary-container' },
   ]
@@ -348,7 +348,7 @@ export default function DeviceHealthScan() {
               key={finding.id}
               className={`p-4 rounded-xl border transition-all ${
                 finding.severity === 'critical' ? 'bg-error-container/10 border-error/20' :
-                finding.severity === 'warning' ? 'bg-orange-50 border-orange-200 dark:bg-orange-950 dark:border-orange-800' :
+                finding.severity === 'warning' ? 'bg-secondary-container/10 border-secondary/20' :
                 finding.severity === 'good' ? 'bg-tertiary-container/10 border-tertiary/20' :
                 'bg-surface-container border-outline-variant'
               }`}
@@ -378,7 +378,7 @@ export default function DeviceHealthScan() {
       <div className="flex gap-3 pb-8">
         <button
           onClick={startScan}
-          className="flex-1 py-3 bg-primary text-on-primary rounded-xl font-label-caps text-label-caps hover:bg-primary-hover transition-all flex items-center justify-center gap-2"
+          className="flex-1 py-3 bg-primary text-on-primary rounded-xl font-label-caps text-label-caps hover:bg-primary/90 transition-all flex items-center justify-center gap-2"
         >
           <span className="material-symbols-outlined">refresh</span>
           RE-SCAN

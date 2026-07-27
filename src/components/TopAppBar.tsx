@@ -8,7 +8,7 @@ export default function TopAppBar() {
   const { userIdShort, admin } = useUser()
 
   return (
-    <header className="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-margin h-16 bg-surface-container-low border-b border-outline-variant">
+    <header className="fixed top-0 left-0 md:left-[240px] w-full md:w-[calc(100%-240px)] z-50 flex justify-between items-center px-margin h-16 bg-surface-container-low border-b border-outline-variant">
       <div className="flex items-center gap-3">
         <button className="material-symbols-outlined text-on-surface-variant hover:bg-surface-variant p-2 rounded-full transition-colors" aria-label="Open menu">
           menu

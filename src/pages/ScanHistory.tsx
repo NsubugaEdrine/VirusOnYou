@@ -240,20 +240,11 @@ export default function ScanHistory() {
             </tbody>
           </table>
         </div>
-        {/* Pagination */}
+        {/* Footer */}
         <div className="p-4 bg-surface-container-high flex items-center justify-between border-t border-outline-variant">
           <p className="font-label-caps text-label-caps text-on-surface-variant">
             Showing {displayed.length} of {scans.length} scans
           </p>
-          <div className="flex items-center gap-2">
-            <button className="w-8 h-8 flex items-center justify-center rounded border border-outline-variant text-on-surface-variant hover:bg-surface-variant hover:border-primary/30 transition-all" disabled aria-label="Previous page">
-              <span className="material-symbols-outlined text-sm">chevron_left</span>
-            </button>
-            <span className="font-label-caps text-label-caps px-2 text-primary">1</span>
-            <button className="w-8 h-8 flex items-center justify-center rounded border border-outline-variant text-on-surface-variant hover:bg-surface-variant hover:border-primary/30 transition-all" aria-label="Next page">
-              <span className="material-symbols-outlined text-sm">chevron_right</span>
-            </button>
-          </div>
         </div>
       </div>
 

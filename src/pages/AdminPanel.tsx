@@ -137,7 +137,7 @@ export default function AdminPanel() {
 
   return (
     <div className="relative w-full">
-      <div className="fixed -top-[20%] -right-[10%] w-[300px] h-[300px] md:w-[500px] md:h-[500px] bg-error/4 rounded-full blur-[120px] pointer-events-none z-0"></div>
+      <div className="absolute -top-[20%] -right-[10%] w-[300px] h-[300px] md:w-[500px] md:h-[500px] bg-error/5 rounded-full blur-[120px] pointer-events-none z-0"></div>
 
       {/* Header */}
       <header className="mb-8 relative z-10 flex items-start justify-between">
@@ -166,17 +166,17 @@ export default function AdminPanel() {
       {/* Global Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
         {[
-          { label: 'TOTAL USERS', value: globalStats.totalUsers, icon: 'group', color: 'primary' },
-          { label: 'TOTAL SCANS', value: globalStats.totalScans, icon: 'search', color: 'secondary' },
-          { label: 'THREATS FOUND', value: globalStats.totalThreats, icon: 'warning', color: 'error' },
-          { label: 'CRITICAL', value: globalStats.criticalThreats, icon: 'report', color: 'error' },
+          { label: 'TOTAL USERS', value: globalStats.totalUsers, icon: 'group', iconClass: 'text-primary', valueClass: 'text-primary' },
+          { label: 'TOTAL SCANS', value: globalStats.totalScans, icon: 'search', iconClass: 'text-secondary', valueClass: 'text-secondary' },
+          { label: 'THREATS FOUND', value: globalStats.totalThreats, icon: 'warning', iconClass: 'text-error', valueClass: 'text-error' },
+          { label: 'CRITICAL', value: globalStats.criticalThreats, icon: 'report', iconClass: 'text-error', valueClass: 'text-error' },
         ].map((stat) => (
           <div key={stat.label} className="bg-surface-container-high p-5 rounded-xl border border-outline-variant">
             <div className="flex items-center gap-2 mb-3">
-              <span className={`material-symbols-outlined text-${stat.color}`}>{stat.icon}</span>
+              <span className={`material-symbols-outlined ${stat.iconClass}`}>{stat.icon}</span>
               <span className="font-label-caps text-label-caps text-on-surface-variant">{stat.label}</span>
             </div>
-            <h3 className={`font-headline-lg text-[28px] text-${stat.color}`}>{stat.value}</h3>
+            <h3 className={`font-headline-lg text-headline-lg ${stat.valueClass}`}>{stat.value}</h3>
           </div>
         ))}
       </div>
