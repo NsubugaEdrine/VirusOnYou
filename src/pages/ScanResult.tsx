@@ -3,13 +3,11 @@ import { useSearchParams, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { Scan, Permission, NetworkIndicator, Component } from '../lib/types'
 import { useUser } from '../lib/userContext'
-import { isAdmin } from '../lib/user'
 
 export default function ScanResult() {
   const [searchParams] = useSearchParams()
   const scanId = searchParams.get('id')
-  const { userId } = useUser()
-  const admin = isAdmin()
+  const { userId, admin } = useUser()
   const [scan, setScan] = useState<Scan | null>(null)
   const [permissions, setPermissions] = useState<Permission[]>([])
   const [networkIndicators, setNetworkIndicators] = useState<NetworkIndicator[]>([])

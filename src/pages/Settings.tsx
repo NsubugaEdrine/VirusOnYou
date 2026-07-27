@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useTheme } from '../lib/ThemeContext'
 import { supabase } from '../lib/supabase'
 import { useUser } from '../lib/userContext'
-import { isAdmin, adminLogin, adminLogout } from '../lib/user'
+import { adminLogin, adminLogout } from '../lib/user'
 
 export default function Settings() {
   const { theme, setTheme } = useTheme()

@@ -13,8 +13,8 @@ export default function TopAppBar() {
         <button className="material-symbols-outlined text-on-surface-variant hover:bg-surface-variant p-2 rounded-full transition-colors" aria-label="Open menu">
           menu
         </button>
-        <img src="/favicon.png" alt="VirusOnYou" className="w-8 h-8 rounded-lg object-cover" />
-        <h1 className="font-headline-md text-headline-md font-bold text-primary tracking-tight">
+        <img src="/favicon.png" alt="VirusOnYou" className="w-8 h-8 rounded-lg object-cover shrink-0" />
+        <h1 className="font-headline-md text-headline-md font-bold text-primary tracking-tight hidden sm:block whitespace-nowrap">
           VirusOnYou
         </h1>
       </div>
@@ -35,10 +35,10 @@ export default function TopAppBar() {
         </div>
       </div>
 
-      <div className="flex items-center gap-2">
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface-container border border-outline-variant text-on-surface-variant">
+      <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+        <div className="flex items-center gap-2 px-2 sm:px-3 py-1.5 rounded-lg bg-surface-container border border-outline-variant text-on-surface-variant">
           <span className="material-symbols-outlined text-[16px]">person</span>
-          <span className="font-code-sm text-xs">{userIdShort}</span>
+          <span className="font-code-sm text-xs hidden sm:inline">{userIdShort}</span>
           {admin && (
             <span className="px-1.5 py-0.5 bg-error/15 text-error border border-error/25 rounded-full font-label-caps text-[8px]">ADM</span>
           )}

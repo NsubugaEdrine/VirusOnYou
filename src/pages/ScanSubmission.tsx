@@ -2,7 +2,7 @@ import { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useUser } from '../lib/userContext'
-import { computeSHA256, analyzeFileForThreats, getFileCategory, getExtension, formatBytes, ANDROID_EXTENSIONS, ARCHIVE_EXTENSIONS } from '../lib/scanner'
+import { computeSHA256, analyzeFileForThreats, getFileCategory, getExtension, formatBytes } from '../lib/scanner'
 
 type ViewState = 'idle' | 'analyzing' | 'results'
 

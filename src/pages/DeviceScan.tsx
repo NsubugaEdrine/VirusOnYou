@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase'
 import { DeviceScanFile, DeviceScanSession, QuarantinedFile, ProtectionEvent } from '../lib/types'
 import {
   THREAT_DB, MALICIOUS_EXTENSIONS, SUSPICIOUS_EXTENSIONS, SYSTEM_EXTENSIONS,
-  computeSHA256Sync, computeSHA256, getExtension, formatBytes,
+  computeSHA256, getExtension, formatBytes,
   analyzeFileForThreats, usbClassToType,
 } from '../lib/scanner'
 

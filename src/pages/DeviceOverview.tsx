@@ -3,12 +3,10 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { Device } from '../lib/types'
 import { useUser } from '../lib/userContext'
-import { isAdmin } from '../lib/user'
 
 export default function DeviceOverview() {
   const navigate = useNavigate()
-  const { userId } = useUser()
-  const admin = isAdmin()
+  const { userId, admin } = useUser()
   const [devices, setDevices] = useState<Device[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('')

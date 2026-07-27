@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { Scan } from '../lib/types'
 import { useUser } from '../lib/userContext'
-import { isAdmin } from '../lib/user'
 
 export default function ScanHistory() {
   const { userId, admin } = useUser()

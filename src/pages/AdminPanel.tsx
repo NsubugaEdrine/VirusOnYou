@@ -155,7 +155,6 @@ export default function AdminPanel() {
           onClick={() => {
             adminLogout()
             refreshAdmin()
-            navigate('/dashboard')
           }}
           className="px-4 py-2 rounded-lg bg-error/15 text-error border border-error/30 font-label-caps text-label-caps hover:bg-error/25 transition-all flex items-center gap-2 whitespace-nowrap"
         >

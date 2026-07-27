@@ -3,22 +3,20 @@ import { NavLink } from 'react-router-dom'
 const navItems = [
   { to: '/dashboard', label: 'HOME', icon: 'dashboard' },
   { to: '/scan-submission', label: 'NEW', icon: 'upload_file' },
-  { to: '/file-scanner', label: 'FILES', icon: 'folder_open' },
-  { to: '/device-scan', label: 'SCAN DEV', icon: 'usb' },
-  { to: '/device-health', label: 'HEALTH', icon: 'health_and_safety' },
+  { to: '/device-scan', label: 'SCAN', icon: 'usb' },
   { to: '/scan-history', label: 'SCANS', icon: 'security' },
   { to: '/settings', label: 'CONFIG', icon: 'settings' },
 ]
 
 export default function BottomNavBar() {
   return (
-    <nav className="fixed bottom-0 left-0 w-full z-50 flex md:hidden justify-around items-center px-2 py-2 pb-safe bg-surface-container-high border-t border-outline-variant shadow-lg rounded-t-xl" aria-label="Mobile navigation">
+    <nav className="fixed bottom-0 left-0 w-full z-50 flex md:hidden justify-around items-center px-1 py-2 pb-[env(safe-area-inset-bottom,0px)] bg-surface-container-high border-t border-outline-variant shadow-lg rounded-t-xl" aria-label="Mobile navigation">
       {navItems.map((item) => (
         <NavLink
           key={item.to}
           to={item.to}
           className={({ isActive }) =>
-            `flex flex-col items-center justify-center p-2 transition-all ${
+            `flex flex-col items-center justify-center p-1.5 sm:p-2 transition-all ${
               isActive
                 ? 'text-primary bg-primary-container/20 rounded-xl scale-90'
                 : 'text-on-surface-variant hover:text-primary'
