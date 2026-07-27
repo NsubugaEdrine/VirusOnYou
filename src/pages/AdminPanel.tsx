@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { adminLogout } from '../lib/user'
-import { useUser } from '../lib/userContext'
+import { useAuth } from '../lib/auth'
 import { Scan } from '../lib/types'
 
 interface UserSummary {
@@ -17,7 +16,7 @@ interface UserSummary {
 
 export default function AdminPanel() {
   const navigate = useNavigate()
-  const { refreshAdmin } = useUser()
+  const { signOut } = useAuth()
   const [users, setUsers] = useState<UserSummary[]>([])
   const [allScans, setAllScans] = useState<Scan[]>([])
   const [loading, setLoading] = useState(true)
@@ -152,14 +151,11 @@ export default function AdminPanel() {
           </p>
         </div>
         <button
-          onClick={() => {
-            adminLogout()
-            refreshAdmin()
-          }}
+          onClick={() => signOut()}
           className="px-4 py-2 rounded-lg bg-error/15 text-error border border-error/30 font-label-caps text-label-caps hover:bg-error/25 transition-all flex items-center gap-2 whitespace-nowrap"
         >
           <span className="material-symbols-outlined text-[18px]">logout</span>
-          Exit Admin
+          Sign Out
         </button>
       </header>
 

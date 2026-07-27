@@ -11,13 +11,16 @@ import ScanHistory from './pages/ScanHistory'
 import ThreatIntel from './pages/ThreatIntel'
 import ScanResult from './pages/ScanResult'
 import Settings from './pages/Settings'
-import AdminLogin from './pages/AdminLogin'
 import AdminPanel from './pages/AdminPanel'
-import AdminRoute from './components/AdminRoute'
+import ProtectedRoute from './components/ProtectedRoute'
+import Login from './pages/Login'
+import SignUp from './pages/SignUp'
 
 export default function App() {
   return (
     <Routes>
+      <Route path="/login" element={<Login />} />
+      <Route path="/signup" element={<SignUp />} />
       <Route element={<Layout />}>
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="/dashboard" element={<Dashboard />} />
@@ -31,8 +34,7 @@ export default function App() {
         <Route path="/threat-intel" element={<ThreatIntel />} />
         <Route path="/scan-result" element={<ScanResult />} />
         <Route path="/settings" element={<Settings />} />
-        <Route path="/admin/login" element={<AdminLogin />} />
-        <Route path="/admin" element={<AdminRoute><AdminPanel /></AdminRoute>} />
+        <Route path="/admin" element={<ProtectedRoute><AdminPanel /></ProtectedRoute>} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Route>
     </Routes>

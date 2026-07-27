@@ -1,17 +1,20 @@
 import { useState } from 'react'
 import { useTheme } from '../lib/ThemeContext'
-import { useUser } from '../lib/userContext'
+import { useAuth } from '../lib/auth'
 import MenuRoundedIcon from '@mui/icons-material/MenuRounded'
 import SearchRoundedIcon from '@mui/icons-material/SearchRounded'
 import PersonRoundedIcon from '@mui/icons-material/PersonRounded'
 import NotificationsRoundedIcon from '@mui/icons-material/NotificationsRounded'
 import LightModeRoundedIcon from '@mui/icons-material/LightModeRounded'
 import DarkModeRoundedIcon from '@mui/icons-material/DarkModeRounded'
+import LogoutRoundedIcon from '@mui/icons-material/LogoutRounded'
 
 export default function TopAppBar() {
   const [searchFocused, setSearchFocused] = useState(false)
   const { theme, setTheme } = useTheme()
-  const { userIdShort, admin } = useUser()
+  const { user, userIdShort, admin, signOut } = useAuth()
+
+  const displayName = user?.email || userIdShort
 
   return (
     <header className="fixed top-0 left-0 md:left-[240px] w-full md:w-[calc(100%-240px)] z-50 flex justify-between items-center px-margin h-16 bg-surface-container-low border-b border-outline-variant/50">
@@ -42,7 +45,7 @@ export default function TopAppBar() {
       <div className="flex items-center gap-1 sm:gap-2 shrink-0">
         <div className="flex items-center gap-2 px-2 sm:px-3 py-1.5 rounded-xl bg-surface-container border border-outline-variant/50 text-on-surface-variant">
           <PersonRoundedIcon sx={{ fontSize: 16 }} />
-          <span className="font-code-sm text-xs hidden sm:inline">{userIdShort}</span>
+          <span className="font-code-sm text-xs hidden sm:inline max-w-[120px] truncate">{displayName}</span>
           {admin && (
             <span className="px-1.5 py-0.5 bg-error/15 text-error border border-error/25 rounded-full font-label-caps text-[8px]">ADM</span>
           )}
@@ -60,6 +63,16 @@ export default function TopAppBar() {
           <NotificationsRoundedIcon />
           <span className="absolute top-1.5 right-1.5 md3-badge" style={{ minWidth: '8px', height: '8px', padding: 0 }}></span>
         </button>
+
+        {user && (
+          <button
+            onClick={() => signOut()}
+            className="md3-icon-btn md3-state-layer text-on-surface-variant"
+            aria-label="Sign out"
+          >
+            <LogoutRoundedIcon />
+          </button>
+        )}
       </div>
     </header>
   )

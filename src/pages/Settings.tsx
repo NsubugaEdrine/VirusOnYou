@@ -1,17 +1,14 @@
 import { useState } from 'react'
 import { useTheme } from '../lib/ThemeContext'
 import { supabase } from '../lib/supabase'
-import { useUser } from '../lib/userContext'
-import { adminLogin, adminLogout } from '../lib/user'
+import { useAuth } from '../lib/auth'
 
 export default function Settings() {
   const { theme, setTheme } = useTheme()
-  const { userId, userIdShort, admin, refreshAdmin } = useUser()
+  const { user, userId, userIdShort, admin, signOut } = useAuth()
   const [scanTarget, setScanTarget] = useState<string>('all')
   const [scanning, setScanning] = useState(false)
   const [scanResult, setScanResult] = useState<string | null>(null)
-  const [adminPin, setAdminPin] = useState('')
-  const [adminError, setAdminError] = useState(false)
 
   async function handleFullScan() {
     setScanning(true)
@@ -226,8 +223,15 @@ export default function Settings() {
             <div className="p-4 bg-surface-container rounded-lg border border-outline-variant/50">
               <p className="font-label-caps text-label-caps text-on-surface-variant mb-1">USER ID</p>
               <p className="text-body-md text-on-surface font-code-sm break-all">{userId}</p>
-              <p className="text-[11px] text-on-surface-variant mt-1">This ID is stored locally in your browser and used to isolate your data.</p>
+              <p className="text-[11px] text-on-surface-variant mt-1">This ID is used to isolate your data.</p>
             </div>
+
+            {user && (
+              <div className="p-4 bg-surface-container rounded-lg border border-outline-variant/50">
+                <p className="font-label-caps text-label-caps text-on-surface-variant mb-1">EMAIL</p>
+                <p className="text-body-md text-on-surface font-code-sm break-all">{user.email}</p>
+              </div>
+            )}
 
             <div className="p-4 bg-surface-container rounded-lg border border-outline-variant/50">
               <p className="font-label-caps text-label-caps text-on-surface-variant mb-1">STATUS</p>
@@ -237,49 +241,32 @@ export default function Settings() {
                     <span className="material-symbols-outlined text-error text-[18px]">admin_panel_settings</span>
                     <p className="text-body-md text-error font-bold">Admin Mode Active</p>
                   </>
-                ) : (
+                ) : user ? (
                   <>
                     <span className="material-symbols-outlined text-tertiary text-[18px]">person</span>
-                    <p className="text-body-md text-on-surface">Regular User</p>
+                    <p className="text-body-md text-on-surface">Authenticated User</p>
+                  </>
+                ) : (
+                  <>
+                    <span className="material-symbols-outlined text-on-surface-variant text-[18px]">person_off</span>
+                    <p className="text-body-md text-on-surface-variant">Anonymous User</p>
                   </>
                 )}
               </div>
             </div>
 
-            {admin ? (
+            {user ? (
               <button
-                onClick={() => { adminLogout(); refreshAdmin() }}
+                onClick={() => signOut()}
                 className="w-full py-3 rounded-xl bg-error/15 text-error border border-error/30 font-label-caps text-label-caps hover:bg-error/25 transition-all flex items-center justify-center gap-2"
               >
                 <span className="material-symbols-outlined text-[18px]">logout</span>
-                Exit Admin Mode
+                Sign Out
               </button>
             ) : (
-              <div className="flex gap-2">
-                <input
-                  type="password"
-                  placeholder="Admin PIN"
-                  value={adminPin}
-                  onChange={(e) => { setAdminPin(e.target.value); setAdminError(false) }}
-                  className={`flex-1 bg-surface-container-lowest border rounded-lg px-3 py-2 text-sm focus:ring-1 outline-none transition-all ${
-                    adminError ? 'border-error focus:border-error focus:ring-error' : 'border-outline-variant focus:border-primary focus:ring-primary'
-                  }`}
-                />
-                <button
-                  onClick={() => {
-                    if (adminLogin(adminPin)) {
-                      refreshAdmin()
-                      setAdminPin('')
-                    } else {
-                      setAdminError(true)
-                    }
-                  }}
-                  disabled={adminPin.length < 4}
-                  className="px-4 py-2 rounded-lg bg-primary/15 text-primary border border-primary/30 font-label-caps text-label-caps hover:bg-primary/25 transition-all disabled:opacity-50"
-                >
-                  Login
-                </button>
-              </div>
+              <p className="text-on-surface-variant text-body-sm text-center py-2">
+                Sign in to enable admin features.
+              </p>
             )}
           </div>
         </section>
