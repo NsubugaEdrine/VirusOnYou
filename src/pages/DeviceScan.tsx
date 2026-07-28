@@ -6,6 +6,10 @@ import {
   computeSHA256, getExtension, formatBytes,
   analyzeFileForThreats, usbClassToType,
 } from '../lib/scanner'
+import {
+  isMassStorageDevice, openMassStorageDevice,
+  scanMassStorageDevice, scsiInquiry,
+} from '../lib/usbMassStorage'
 
 type DeviceView = 'dashboard' | 'detection' | 'scan-options' | 'scanning' | 'complete' | 'quarantine' | 'history'
 type ScanType = 'quick' | 'full' | 'custom' | 'integrity' | 'removable'
@@ -32,7 +36,15 @@ export default function DeviceScan() {
   const [scanHistory, setScanHistory] = useState<Array<{ id: string; deviceName: string; scanType: string; startedAt: string; threats: number; totalFiles: number }>>([])
   const [lastScanResult, setLastScanResult] = useState<{ threats: number; clean: number; total: number } | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const dirInputRef = useRef<HTMLInputElement>(null)
   const abortRef = useRef(false)
+  const usbDevicesRef = useRef<Map<string, USBDevice>>(new Map())
+  const [massStorageInfo, setMassStorageInfo] = useState<{ vendor: string; product: string; capacity: string } | null>(null)
+
+  function isMassStorageDeviceById(id: string): boolean {
+    const usbDev = usbDevicesRef.current.get(id)
+    return usbDev ? isMassStorageDevice(usbDev) : false
+  }
 
   function addEvent(type: ProtectionEvent['type'], title: string, description: string, severity: ProtectionEvent['severity']) {
     setEvents((prev) => [{ id: crypto.randomUUID(), type, title, description, severity, timestamp: new Date().toISOString() }, ...prev].slice(0, 100))
@@ -56,26 +68,32 @@ export default function DeviceScan() {
     const usb = navigator.usb
     if (!usb) return
     usb.getDevices().then((list) => {
-      list.forEach((d) => addDevice({
-        id: d.serialNumber || d.productName || `usb-${d.vendorId}-${d.productId}`,
-        name: d.productName || d.manufacturerName || 'USB Device',
-        type: usbClassToType(d.deviceClass),
-        protocol: 'usb', connectedAt: new Date(),
-        manufacturer: d.manufacturerName, apiDetail: `USB v${d.usbVersionMajor}.${d.usbVersionMinor}`,
-      }))
+      list.forEach((d) => {
+        const id = d.serialNumber || d.productName || `usb-${d.vendorId}-${d.productId}`
+        usbDevicesRef.current.set(id, d)
+        addDevice({
+          id, name: d.productName || d.manufacturerName || 'USB Device',
+          type: usbClassToType(d.deviceClass),
+          protocol: 'usb', connectedAt: new Date(),
+          manufacturer: d.manufacturerName, apiDetail: `USB v${d.usbVersionMajor}.${d.usbVersionMinor}`,
+        })
+      })
     }).catch(() => {})
     const onConnect = (e: Event) => {
       const d = (e as USBConnectionEvent).device
+      const id = d.serialNumber || d.productName || `usb-${d.vendorId}-${d.productId}`
+      usbDevicesRef.current.set(id, d)
       addDevice({
-        id: d.serialNumber || d.productName || `usb-${d.vendorId}-${d.productId}`,
-        name: d.productName || d.manufacturerName || 'USB Device',
+        id, name: d.productName || d.manufacturerName || 'USB Device',
         type: usbClassToType(d.deviceClass), protocol: 'usb', connectedAt: new Date(),
         manufacturer: d.manufacturerName, apiDetail: `USB v${d.usbVersionMajor}.${d.usbVersionMinor}`,
       })
     }
     const onDisconnect = (e: Event) => {
       const d = (e as USBConnectionEvent).device
-      removeDevice(d.serialNumber || d.productName || `usb-${d.vendorId}-${d.productId}`, 'usb')
+      const id = d.serialNumber || d.productName || `usb-${d.vendorId}-${d.productId}`
+      usbDevicesRef.current.delete(id)
+      removeDevice(id, 'usb')
     }
     usb.addEventListener('connect', onConnect)
     usb.addEventListener('disconnect', onDisconnect)
@@ -140,9 +158,10 @@ export default function DeviceScan() {
     if (!usb) return
     try {
       const d = await usb.requestDevice({ filters: [] })
+      const id = d.serialNumber || d.productName || `usb-${d.vendorId}-${d.productId}`
+      usbDevicesRef.current.set(id, d)
       addDevice({
-        id: d.serialNumber || d.productName || `usb-${d.vendorId}-${d.productId}`,
-        name: d.productName || d.manufacturerName || 'USB Device',
+        id, name: d.productName || d.manufacturerName || 'USB Device',
         type: usbClassToType(d.deviceClass), protocol: 'usb', connectedAt: new Date(),
         manufacturer: d.manufacturerName, apiDetail: `USB v${d.usbVersionMajor}.${d.usbVersionMinor}`,
       })
@@ -184,7 +203,20 @@ export default function DeviceScan() {
   function startScan(type: ScanType) {
     setSelectedScanType(type)
     setView('scanning')
-    fileInputRef.current?.click()
+
+    if (selectedDevice && selectedDevice.protocol === 'usb') {
+      const usbDev = usbDevicesRef.current.get(selectedDevice.id)
+      if (usbDev && isMassStorageDevice(usbDev)) {
+        startUsbMassStorageScan(usbDev)
+        return
+      }
+    }
+
+    if (type === 'full' || type === 'removable') {
+      dirInputRef.current?.click()
+    } else {
+      fileInputRef.current?.click()
+    }
   }
 
   function handleFileInput(e: React.ChangeEvent<HTMLInputElement>) {
@@ -207,11 +239,24 @@ export default function DeviceScan() {
       if (filtered.length === 0) filtered = files
     }
 
+    startScanSession(filtered)
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  function handleDirectoryInput(e: React.ChangeEvent<HTMLInputElement>) {
+    const selected = e.target.files
+    if (!selected || selected.length === 0) { setView('scan-options'); return }
+    const files = Array.from(selected)
+    startScanSession(files)
+    if (dirInputRef.current) dirInputRef.current.value = ''
+  }
+
+  function startScanSession(files: File[]) {
     const sess: DeviceScanSession = {
       id: crypto.randomUUID(), deviceName: selectedDevice?.name || 'Local Files', sourceType: 'files',
-      startedAt: new Date().toISOString(), completedAt: null, totalFiles: filtered.length, scannedFiles: 0,
+      startedAt: new Date().toISOString(), completedAt: null, totalFiles: files.length, scannedFiles: 0,
       cleanFiles: 0, threatFiles: 0, corruptedFiles: 0, errorFiles: 0,
-      files: filtered.map((f) => ({
+      files: files.map((f) => ({
         name: f.name, path: (f as unknown as { webkitRelativePath?: string }).webkitRelativePath || f.name,
         size: f.size, type: f.type || 'unknown', sha256: 'pending',
         status: 'pending' as const, threatLevel: 'None' as const, threatName: null, riskScore: 0, details: '',
@@ -220,8 +265,7 @@ export default function DeviceScan() {
     }
     setSession(sess)
     setScanning(true)
-    scanAllFiles(filtered, sess)
-    if (fileInputRef.current) fileInputRef.current.value = ''
+    scanAllFiles(files, sess)
   }
 
   async function scanAllFiles(files: File[], sess: DeviceScanSession) {
@@ -309,6 +353,60 @@ export default function DeviceScan() {
     setCurrentScanFile('')
   }
 
+  async function startUsbMassStorageScan(usbDev: USBDevice) {
+    const devName = selectedDevice?.name || 'USB Mass Storage'
+    addEvent('scan_complete', `Direct USB scan started`, `Reading ${devName} via WebUSB protocol...`, 'info')
+
+    const sess: DeviceScanSession = {
+      id: crypto.randomUUID(), deviceName: devName, sourceType: 'files',
+      startedAt: new Date().toISOString(), completedAt: null, totalFiles: 0, scannedFiles: 0,
+      cleanFiles: 0, threatFiles: 0, corruptedFiles: 0, errorFiles: 0,
+      files: [], status: 'scanning',
+    }
+    setSession(sess)
+    setScanning(true)
+
+    try {
+      await openMassStorageDevice(usbDev)
+      await scanMassStorageDevice(
+        usbDev,
+        (current, total, fileName) => {
+          setCurrentScanFile(fileName)
+          setProgress(Math.round((current / total) * 100))
+          setSession((prev) => prev ? { ...prev, totalFiles: total, scannedFiles: current } : prev)
+        },
+        (fileName, threatName, riskScore) => {
+          addEvent('threat_blocked', `Threat detected: ${threatName}`, `${fileName} — Risk Score: ${riskScore}/100`, 'critical')
+          setSession((prev) => prev ? { ...prev, threatFiles: prev.threatFiles + 1 } : prev)
+        },
+        (results) => {
+          setSession((prev) => prev ? {
+            ...prev, status: 'complete', completedAt: new Date().toISOString(),
+            cleanFiles: results.clean, threatFiles: results.threats,
+          } : prev)
+          setLastScanResult(results)
+          setScanHistory((prev) => [{
+            id: crypto.randomUUID(), deviceName: devName,
+            scanType: selectedScanType || 'full', startedAt: sess.startedAt,
+            threats: results.threats, totalFiles: results.total,
+          }, ...prev])
+          addEvent('scan_complete', 'USB mass storage scan completed',
+            `${results.total} files scanned — ${results.threats} threat(s) detected`, results.threats > 0 ? 'critical' : 'success')
+          setProgress(100)
+          setScanning(false)
+          setView('complete')
+          setCurrentScanFile('')
+        },
+      )
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Unknown error'
+      addEvent('update', 'USB scan failed', msg, 'critical')
+      setScanning(false)
+      setView('scan-options')
+      setCurrentScanFile('')
+    }
+  }
+
   function quarantineFile(file: DeviceScanFile) {
     const qf: QuarantinedFile = {
       id: crypto.randomUUID(), originalName: file.name, originalPath: file.path,
@@ -371,6 +469,7 @@ export default function DeviceScan() {
     <>
       <div className="absolute -top-[20%] -left-[10%] w-[500px] h-[500px] bg-secondary/4 rounded-full blur-[120px] pointer-events-none"></div>
       <input ref={fileInputRef} type="file" multiple className="hidden" onChange={handleFileInput} />
+      <input ref={dirInputRef} type="file" multiple className="hidden" onChange={handleDirectoryInput} {...{ webkitdirectory: '' }} />
 
       {/* Header + Nav Tabs */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 relative">
@@ -553,25 +652,30 @@ export default function DeviceScan() {
                 <span className="px-2 py-0.5 rounded-full bg-tertiary/15 text-tertiary text-[10px] font-bold border border-tertiary/25 animate-pulse">LIVE MONITORING</span>
               </div>
               <div className="divide-y divide-outline-variant/30">
-                {devices.map((dev) => (
+                {devices.map((dev) => {
+                  const isMassStorage = dev.protocol === 'usb' && isMassStorageDeviceById(dev.id)
+                  return (
                   <div key={`${dev.protocol}-${dev.id}`} className="p-4 flex items-center gap-4 hover:bg-surface-variant/20 transition-colors group">
-                    <div className="w-12 h-12 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0 group-hover:shadow-glow-primary transition-all">
-                      <span className="material-symbols-outlined text-primary">{protocolIcon(dev.protocol)}</span>
+                    <div className={`w-12 h-12 rounded-xl border flex items-center justify-center shrink-0 group-hover:shadow-glow-primary transition-all ${isMassStorage ? 'bg-error/10 border-error/30' : 'bg-primary/10 border-primary/20'}`}>
+                      <span className={`material-symbols-outlined ${isMassStorage ? 'text-error' : 'text-primary'}`}>{protocolIcon(dev.protocol)}</span>
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-0.5">
                         <span className="font-body-md font-bold text-on-surface truncate">{dev.name}</span>
                         <span className="px-1.5 py-0.5 rounded bg-tertiary/15 text-tertiary text-[9px] font-bold border border-tertiary/25">CONNECTED</span>
                         <span className="px-1.5 py-0.5 rounded bg-surface-variant text-on-surface-variant text-[9px] font-bold border border-outline-variant/50 uppercase">{dev.protocol}</span>
+                        {isMassStorage && <span className="px-1.5 py-0.5 rounded bg-error/15 text-error text-[9px] font-bold border border-error/25">DIRECT USB</span>}
                       </div>
                       <p className="text-xs text-on-surface-variant">{dev.type}</p>
                       {dev.manufacturer && <p className="text-[11px] text-on-surface-variant/60">{dev.manufacturer}</p>}
+                      {isMassStorage && <p className="text-[10px] text-error/80 mt-0.5">Supports direct protocol-level scanning via WebUSB</p>}
                     </div>
                     <button onClick={() => selectDeviceForScan(dev)} className="px-4 py-2 rounded-lg bg-gradient-to-r from-primary to-primary-container text-on-primary font-label-caps text-label-caps opacity-0 group-hover:opacity-100 transition-all hover:shadow-glow-primary">
                       <span className="material-symbols-outlined text-sm mr-1">scan</span>Scan
                     </button>
                   </div>
-                ))}
+                  )
+                })}
               </div>
             </div>
           ) : (
@@ -606,13 +710,23 @@ export default function DeviceScan() {
             <button onClick={() => setView('detection')} className="px-4 py-2 rounded-lg border border-outline-variant text-on-surface-variant text-sm hover:bg-surface-variant transition-all">Back</button>
           </div>
 
+          {selectedDevice.protocol === 'usb' && isMassStorageDeviceById(selectedDevice.id) && (
+            <div className="glass-panel rounded-xl p-4 border border-error/30 bg-error/5 flex items-center gap-3">
+              <span className="material-symbols-outlined text-error">usb</span>
+              <div>
+                <p className="font-bold text-sm text-on-surface">USB Mass Storage Detected</p>
+                <p className="text-xs text-on-surface-variant">Full Scan and Removable Drive Scan will access this device directly via WebUSB protocol — no file picker needed.</p>
+              </div>
+            </div>
+          )}
+
           <h3 className="font-headline-md text-headline-md text-on-surface">Select Scan Mode</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {[
               { type: 'quick' as const, icon: 'bolt', title: 'Quick Scan', desc: 'Scans only executable and suspicious file extensions for fast threat detection.', time: '~30 sec', color: 'bg-primary/15 text-primary', border: 'border-primary/30', glow: 'hover:shadow-glow-primary' },
-              { type: 'full' as const, icon: 'scan', title: 'Full Scan', desc: 'Deep scan of every file. Computes SHA-256 and matches against threat database.', time: '~2-5 min', color: 'bg-error/15 text-error', border: 'border-error/30', glow: 'hover:shadow-glow-error' },
+              { type: 'full' as const, icon: 'scan', title: 'Full Scan', desc: 'Deep scan of every file on a device/folder. Computes SHA-256 and matches against threat database.', time: '~2-5 min', color: 'bg-error/15 text-error', border: 'border-error/30', glow: 'hover:shadow-glow-error' },
               { type: 'integrity' as const, icon: 'verified', title: 'Integrity Check', desc: 'Finds corrupted, empty, or truncated files that indicate storage damage.', time: '~1 min', color: 'bg-tertiary/15 text-tertiary', border: 'border-tertiary/30', glow: 'hover:shadow-glow-tertiary' },
-              { type: 'removable' as const, icon: 'usb', title: 'Removable Drive Scan', desc: 'Focuses on autorun, system files, and executable threats common on USB drives.', time: '~1 min', color: 'bg-secondary/15 text-secondary', border: 'border-secondary/30', glow: 'hover:shadow-glow-secondary' },
+              { type: 'removable' as const, icon: 'usb', title: 'Removable Drive Scan', desc: 'Focuses on autorun, system files, and executable threats. Uses direct USB protocol access when available.', time: '~1 min', color: 'bg-secondary/15 text-secondary', border: 'border-secondary/30', glow: 'hover:shadow-glow-secondary' },
               { type: 'custom' as const, icon: 'tune', title: 'Custom Scan', desc: 'Hand-pick specific files or folders to scan on your own terms.', time: 'Varies', color: 'bg-surface-container-high text-on-surface', border: 'border-outline-variant', glow: 'hover:bg-surface-variant' },
             ].map((opt) => (
               <button key={opt.type} onClick={() => startScan(opt.type)} className={`text-left p-6 rounded-xl border-2 ${opt.border} bg-surface-container-lowest transition-all duration-300 ${opt.glow} group relative overflow-hidden`}>
@@ -647,7 +761,12 @@ export default function DeviceScan() {
                   <h3 className="font-headline-md text-headline-md text-on-surface">
                     {selectedScanType?.toUpperCase()} Scan — {session.deviceName}
                   </h3>
-                  <p className="text-on-surface-variant text-sm">{currentScanFile || 'Initializing scan engine...'}</p>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <p className="text-on-surface-variant text-sm">{currentScanFile || 'Initializing scan engine...'}</p>
+                    {selectedDevice && selectedDevice.protocol === 'usb' && isMassStorageDeviceById(selectedDevice.id) && (
+                      <span className="px-1.5 py-0.5 rounded bg-error/15 text-error text-[9px] font-bold border border-error/25 animate-pulse">USB DIRECT</span>
+                    )}
+                  </div>
                 </div>
               </div>
               <button onClick={() => { abortRef.current = true; setView('scan-options'); setSession(null); setScanning(false) }}
